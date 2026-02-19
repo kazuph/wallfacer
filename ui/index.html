@@ -4,51 +4,258 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wallfacer — Kanban</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <style>
-  body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+  /* --- Theme variables --- */
+  :root, [data-theme="light"] {
+    --bg: #e8e8e8;
+    --bg-raised: #dcdcdc;
+    --bg-card: #ffffff;
+    --bg-input: #f0f0f0;
+    --text: #1a1a1a;
+    --text-secondary: #444444;
+    --text-muted: #777777;
+    --accent: #0055aa;
+    --accent-hover: #003d7a;
+    --border: #cccccc;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  [data-theme="dark"] {
+    --bg: #111111;
+    --bg-raised: #1a1a1a;
+    --bg-card: #222222;
+    --bg-input: #181818;
+    --text: #f5f5f5;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666666;
+    --accent: #4da6ff;
+    --accent-hover: #7abfff;
+    --border: #333333;
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  ::selection { background: #555; color: #fff; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+  }
+
+  /* --- Layout --- */
   .column { min-height: calc(100vh - 160px); }
-  .card { cursor: grab; transition: transform 0.1s, box-shadow 0.1s; }
-  .card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .col-bg { background: var(--bg-raised); border-radius: 12px; padding: 12px; }
+
+  /* --- Cards --- */
+  .card {
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .card:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
   .card.sortable-ghost { opacity: 0.4; }
-  .card.sortable-chosen { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-  .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-  .badge-backlog { background: #334155; color: #94a3b8; }
-  .badge-in_progress { background: #1e3a5f; color: #60a5fa; }
-  .badge-waiting { background: #422006; color: #fbbf24; }
-  .badge-done { background: #052e16; color: #4ade80; }
-  .badge-failed { background: #450a0a; color: #f87171; }
-  .spinner { border: 2px solid #334155; border-top-color: #60a5fa; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display: inline-block; }
+  .card.sortable-chosen { box-shadow: var(--shadow-lg); }
+
+  /* --- Badges --- */
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+  .badge-backlog { background: #e5e7eb; color: #6b7280; }
+  .badge-in_progress { background: #dbeafe; color: #1e40af; }
+  .badge-waiting { background: #fef3c7; color: #92400e; }
+  .badge-done { background: #d1fae5; color: #065f46; }
+  .badge-failed { background: #fee2e2; color: #991b1b; }
+  [data-theme="dark"] .badge-backlog { background: #333; color: #94a3b8; }
+  [data-theme="dark"] .badge-in_progress { background: #1e3a5f; color: #60a5fa; }
+  [data-theme="dark"] .badge-waiting { background: #422006; color: #fbbf24; }
+  [data-theme="dark"] .badge-done { background: #052e16; color: #4ade80; }
+  [data-theme="dark"] .badge-failed { background: #450a0a; color: #f87171; }
+
+  /* --- Spinner --- */
+  .spinner {
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%; width: 16px; height: 16px;
+    animation: spin 0.8s linear infinite; display: inline-block;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- Modal --- */
+  .modal-overlay { background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); }
+  [data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.6); }
+  .modal-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 672px; width: 100%;
+    max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg);
+  }
+
+  /* --- Column headers --- */
+  .col-header { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .col-header-backlog { color: var(--text-muted); }
+  .col-header-progress { color: #2563eb; }
+  .col-header-waiting { color: #d97706; }
+  .col-header-done { color: #16a34a; }
+  [data-theme="dark"] .col-header-progress { color: #60a5fa; }
+  [data-theme="dark"] .col-header-waiting { color: #fbbf24; }
+  [data-theme="dark"] .col-header-done { color: #4ade80; }
+
+  /* --- Event type colors --- */
+  .ev-state { color: #2563eb; }
+  .ev-output { color: #16a34a; }
+  .ev-feedback { color: #d97706; }
+  .ev-error { color: #dc2626; }
+  [data-theme="dark"] .ev-state { color: #60a5fa; }
+  [data-theme="dark"] .ev-output { color: #4ade80; }
+  [data-theme="dark"] .ev-feedback { color: #fbbf24; }
+  [data-theme="dark"] .ev-error { color: #f87171; }
+
+  /* --- Form elements --- */
+  .field {
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 12px; font-size: 14px; outline: none; width: 100%;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; resize: none;
+    box-sizing: border-box;
+  }
+  .field::placeholder { color: var(--text-muted); }
+  .field:focus { border-color: var(--accent); }
+
+  .select {
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text-secondary);
+    border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none;
+  }
+  .select:focus { border-color: var(--accent); }
+
+  /* --- Buttons --- */
+  .btn { border: none; border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-accent:hover { background: var(--accent-hover); }
+  .btn-yellow { background: #d97706; color: #fff; }
+  .btn-yellow:hover { background: #b45309; }
+  .btn-green { background: #16a34a; color: #fff; }
+  .btn-green:hover { background: #15803d; }
+  .btn-ghost { background: transparent; color: var(--text-muted); border: none; padding: 6px 16px; font-size: 14px; cursor: pointer; }
+  .btn-ghost:hover { color: var(--text); }
+  .btn-dashed {
+    width: 100%; border: 1px dashed var(--border); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; color: var(--text-muted);
+    background: transparent; cursor: pointer;
+  }
+  .btn-dashed:hover { color: var(--text-secondary); border-color: var(--text-muted); }
+  .btn-danger { color: #dc2626; background: none; border: none; cursor: pointer; font-size: 14px; }
+  .btn-danger:hover { color: #b91c1c; }
+  [data-theme="dark"] .btn-danger { color: #f87171; }
+  [data-theme="dark"] .btn-danger:hover { color: #fca5a5; }
+
+  /* --- Code / log blocks --- */
   pre { white-space: pre-wrap; word-break: break-word; }
+  .code-block {
+    background: var(--bg-input); border-radius: 8px; padding: 16px;
+    font-size: 14px; color: var(--text-secondary);
+  }
+  .logs-block {
+    background: #0d1117; border-radius: 8px; padding: 16px;
+    font-size: 12px; color: #4ade80; max-height: 384px;
+    overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* --- Usage stats --- */
+  .usage-grid {
+    background: var(--bg-input); border-radius: 8px; padding: 16px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 14px;
+  }
+  .usage-label { color: var(--text-muted); }
+  .usage-value { color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; text-align: right; }
+
+  /* --- Settings panel --- */
+  .settings-panel {
+    position: absolute; top: 100%; right: 0; margin-top: 8px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; min-width: 200px;
+    box-shadow: var(--shadow-lg); z-index: 100;
+  }
+  .settings-btn {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 6px; display: flex; align-items: center;
+    border-radius: 6px;
+  }
+  .settings-btn:hover { color: var(--text); }
+
+  .theme-switch {
+    display: flex; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .theme-switch button {
+    flex: 1; padding: 6px 0; font-size: 12px; font-weight: 500;
+    background: transparent; color: var(--text-muted);
+    border: none; cursor: pointer;
+  }
+  .theme-switch button.active { background: var(--accent); color: #fff; }
+  .theme-switch button:hover:not(.active) { color: var(--text); }
+
+  /* --- Utility --- */
+  .text-v-primary { color: var(--text); }
+  .text-v-secondary { color: var(--text-secondary); }
+  .text-v-muted { color: var(--text-muted); }
+  .border-v { border-color: var(--border); }
+  .section-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 </style>
 </head>
 <body class="min-h-screen">
 
+<!-- Theme init (before render to prevent flash) -->
+<script>
+(function() {
+  var mode = localStorage.getItem('wallfacer-theme') || 'auto';
+  var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+})();
+</script>
+
 <!-- Header -->
-<header class="border-b border-slate-700 px-6 py-4">
-  <h1 class="text-xl font-bold text-white">Wallfacer</h1>
+<header style="border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;">
+  <h1 style="font-size: 18px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 0;">Wallfacer</h1>
+  <div style="position: relative;">
+    <button id="settings-btn" class="settings-btn" onclick="toggleSettings(event)" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+    <div id="settings-panel" class="settings-panel hidden">
+      <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
+      <div class="theme-switch" id="theme-switch">
+        <button data-mode="light" onclick="setTheme('light')">Light</button>
+        <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
+        <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+      </div>
+    </div>
+  </div>
 </header>
 
 <!-- Board -->
 <main class="grid grid-cols-4 gap-4 p-6" id="board">
   <div class="flex flex-col">
     <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Backlog</h2>
-      <span id="count-backlog" class="text-xs text-slate-500">0</span>
+      <h2 class="col-header col-header-backlog">Backlog</h2>
+      <span id="count-backlog" class="text-xs text-v-muted">0</span>
     </div>
-    <button id="new-task-btn" onclick="showNewTaskForm()"
-      class="w-full border border-dashed border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors mb-2">+ New Task</button>
+    <button id="new-task-btn" onclick="showNewTaskForm()" class="btn-dashed mb-2">+ New Task</button>
     <div id="new-task-form" class="hidden mb-2">
-      <textarea id="new-prompt" rows="4" placeholder="Describe your task (Markdown supported)..."
-        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
+      <textarea id="new-prompt" rows="4" placeholder="Describe your task (Markdown supported)..." class="field"></textarea>
       <div class="flex items-center gap-2 mt-2">
-        <button onclick="createTask()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium text-white">Save</button>
-        <button onclick="hideNewTaskForm()" class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+        <button onclick="createTask()" class="btn btn-accent">Save</button>
+        <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
         <div class="ml-auto flex items-center gap-1.5">
-          <label for="new-timeout" class="text-xs text-slate-500">Timeout</label>
-          <select id="new-timeout" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+          <label for="new-timeout" class="text-xs text-v-muted">Timeout</label>
+          <select id="new-timeout" class="select">
             <option value="5" selected>5 min</option>
             <option value="15">15 min</option>
             <option value="30">30 min</option>
@@ -61,55 +268,54 @@
         </div>
       </div>
     </div>
-    <div id="col-backlog" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="backlog"></div>
+    <div id="col-backlog" class="column col-bg space-y-2" data-status="backlog"></div>
   </div>
   <div class="flex flex-col">
     <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wide">In Progress</h2>
-      <span id="count-in_progress" class="text-xs text-slate-500">0</span>
+      <h2 class="col-header col-header-progress">In Progress</h2>
+      <span id="count-in_progress" class="text-xs text-v-muted">0</span>
     </div>
-    <div id="col-in_progress" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="in_progress"></div>
+    <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress"></div>
   </div>
   <div class="flex flex-col">
     <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="text-sm font-semibold text-yellow-400 uppercase tracking-wide">Waiting</h2>
-      <span id="count-waiting" class="text-xs text-slate-500">0</span>
+      <h2 class="col-header col-header-waiting">Waiting</h2>
+      <span id="count-waiting" class="text-xs text-v-muted">0</span>
     </div>
-    <div id="col-waiting" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="waiting"></div>
+    <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting"></div>
   </div>
   <div class="flex flex-col">
     <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="text-sm font-semibold text-green-400 uppercase tracking-wide">Done</h2>
-      <span id="count-done" class="text-xs text-slate-500">0</span>
+      <h2 class="col-header col-header-done">Done</h2>
+      <span id="count-done" class="text-xs text-v-muted">0</span>
     </div>
-    <div id="col-done" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="done"></div>
+    <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
   </div>
 </main>
 
 <!-- Detail Modal -->
 <div id="modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700">
+  <div class="modal-card">
     <div class="p-6">
       <div class="flex items-start justify-between mb-4">
         <div class="flex items-center gap-3">
-          <span id="modal-badge" class="px-2 py-0.5 rounded text-xs font-medium"></span>
-          <span id="modal-time" class="text-xs text-slate-500"></span>
+          <span id="modal-badge" class="badge"></span>
+          <span id="modal-time" class="text-xs text-v-muted"></span>
         </div>
-        <button onclick="closeModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+        <button onclick="closeModal()" class="text-v-muted text-xl leading-none" style="background:none;border:none;cursor:pointer;font-size:20px;">&times;</button>
       </div>
 
-      <h3 class="text-lg font-semibold text-white mb-2">Prompt</h3>
-      <pre id="modal-prompt" class="bg-slate-900 rounded-lg p-4 text-sm text-slate-300 mb-4"></pre>
+      <h3 class="section-title">Prompt</h3>
+      <pre id="modal-prompt" class="code-block mb-4"></pre>
 
       <!-- Editable prompt/timeout for backlog tasks -->
       <div id="modal-edit-section" class="hidden mb-4">
-        <textarea id="modal-edit-prompt" rows="4"
-          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
+        <textarea id="modal-edit-prompt" rows="4" class="field"></textarea>
         <div class="flex items-center gap-2 mt-2">
-          <span id="modal-edit-status" class="text-xs text-slate-500"></span>
+          <span id="modal-edit-status" class="text-xs text-v-muted"></span>
           <div class="ml-auto flex items-center gap-1.5">
-            <label for="modal-edit-timeout" class="text-xs text-slate-500">Timeout</label>
-            <select id="modal-edit-timeout" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+            <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
+            <select id="modal-edit-timeout" class="select">
               <option value="5">5 min</option>
               <option value="15">15 min</option>
               <option value="30">30 min</option>
@@ -126,73 +332,112 @@
       <!-- Prompt history (collapsible) -->
       <div id="modal-history-section" class="hidden mb-4">
         <details>
-          <summary class="text-sm font-medium text-slate-400 cursor-pointer hover:text-slate-200">Prompt History</summary>
+          <summary class="text-sm font-medium text-v-muted" style="cursor:pointer;">Prompt History</summary>
           <div id="modal-history-list" class="mt-2 space-y-2"></div>
         </details>
       </div>
 
       <!-- Resume section for failed tasks with session_id -->
       <div id="modal-resume-section" class="hidden mb-4">
-        <h3 class="text-lg font-semibold text-white mb-2">Resume Session</h3>
-        <p class="text-sm text-slate-400 mb-2">This task has an active session. Resume to continue from where it left off.</p>
-        <button onclick="resumeTask()" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Resume</button>
+        <h3 class="section-title">Resume Session</h3>
+        <p class="text-sm text-v-secondary mb-2">This task has an active session. Resume to continue from where it left off.</p>
+        <button onclick="resumeTask()" class="btn btn-green">Resume</button>
       </div>
 
       <!-- Retry section for done/failed tasks -->
       <div id="modal-retry-section" class="hidden mb-4">
-        <h3 class="text-lg font-semibold text-white mb-2">Retry</h3>
-        <textarea id="modal-retry-prompt" rows="4"
-          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
-        <button onclick="retryTask()" class="mt-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Move to Backlog</button>
+        <h3 class="section-title">Retry</h3>
+        <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
+        <button onclick="retryTask()" class="btn btn-accent mt-2">Move to Backlog</button>
       </div>
 
       <div id="modal-result-section" class="hidden">
-        <h3 class="text-lg font-semibold text-white mb-2">Result</h3>
-        <pre id="modal-result" class="bg-slate-900 rounded-lg p-4 text-sm text-slate-300 mb-4"></pre>
+        <h3 class="section-title">Result</h3>
+        <pre id="modal-result" class="code-block mb-4"></pre>
       </div>
 
       <!-- Usage stats -->
       <div id="modal-usage-section" class="hidden mb-4">
-        <h3 class="text-lg font-semibold text-white mb-2">Usage</h3>
-        <div class="bg-slate-900 rounded-lg p-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-          <div class="flex justify-between"><span class="text-slate-400">Input tokens</span><span id="modal-usage-input" class="text-slate-200 font-mono"></span></div>
-          <div class="flex justify-between"><span class="text-slate-400">Output tokens</span><span id="modal-usage-output" class="text-slate-200 font-mono"></span></div>
-          <div class="flex justify-between"><span class="text-slate-400">Cache read</span><span id="modal-usage-cache-read" class="text-slate-200 font-mono"></span></div>
-          <div class="flex justify-between"><span class="text-slate-400">Cache creation</span><span id="modal-usage-cache-creation" class="text-slate-200 font-mono"></span></div>
-          <div class="flex justify-between col-span-2 pt-1 border-t border-slate-700 mt-1"><span class="text-slate-400">Cost</span><span id="modal-usage-cost" class="text-slate-200 font-mono"></span></div>
+        <h3 class="section-title">Usage</h3>
+        <div class="usage-grid">
+          <div class="flex justify-between"><span class="usage-label">Input tokens</span><span id="modal-usage-input" class="usage-value"></span></div>
+          <div class="flex justify-between"><span class="usage-label">Output tokens</span><span id="modal-usage-output" class="usage-value"></span></div>
+          <div class="flex justify-between"><span class="usage-label">Cache read</span><span id="modal-usage-cache-read" class="usage-value"></span></div>
+          <div class="flex justify-between"><span class="usage-label">Cache creation</span><span id="modal-usage-cache-creation" class="usage-value"></span></div>
+          <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
         </div>
       </div>
 
       <!-- Live logs for in-progress tasks -->
       <div id="modal-logs-section" class="hidden mb-4">
-        <h3 class="text-lg font-semibold text-white mb-2">Live Output</h3>
-        <pre id="modal-logs" class="bg-slate-900 rounded-lg p-4 text-xs text-green-300 max-h-96 overflow-y-auto font-mono"></pre>
+        <h3 class="section-title">Live Output</h3>
+        <pre id="modal-logs" class="logs-block"></pre>
       </div>
 
       <!-- Feedback form for waiting tasks -->
       <div id="modal-feedback-section" class="hidden mb-4">
-        <h3 class="text-lg font-semibold text-white mb-2">Provide Feedback</h3>
-        <textarea id="modal-feedback" rows="3" placeholder="Type your response..."
-          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"></textarea>
+        <h3 class="section-title">Provide Feedback</h3>
+        <textarea id="modal-feedback" rows="3" placeholder="Type your response..." class="field"></textarea>
         <div class="flex items-center gap-2 mt-2">
-          <button onclick="submitFeedback()" class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Submit Feedback</button>
-          <button onclick="completeTask()" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Mark as Done</button>
+          <button onclick="submitFeedback()" class="btn btn-yellow">Submit Feedback</button>
+          <button onclick="completeTask()" class="btn btn-green">Mark as Done</button>
         </div>
       </div>
 
       <!-- Events timeline -->
-      <h3 class="text-lg font-semibold text-white mb-2">Events</h3>
+      <h3 class="section-title">Events</h3>
       <div id="modal-events" class="space-y-2"></div>
 
       <!-- Delete button -->
-      <div class="mt-6 pt-4 border-t border-slate-700">
-        <button onclick="deleteCurrentTask()" class="text-red-400 hover:text-red-300 text-sm">Delete task</button>
+      <div class="mt-6 pt-4" style="border-top: 1px solid var(--border);">
+        <button onclick="deleteCurrentTask()" class="btn-danger">Delete task</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+// --- Theme ---
+function getResolvedTheme(mode) {
+  if (mode === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return mode;
+}
+
+function setTheme(mode) {
+  localStorage.setItem('wallfacer-theme', mode);
+  document.documentElement.setAttribute('data-theme', getResolvedTheme(mode));
+  document.querySelectorAll('#theme-switch button').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+(function() {
+  var mode = localStorage.getItem('wallfacer-theme') || 'auto';
+  document.querySelectorAll('#theme-switch button').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+})();
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+  var mode = localStorage.getItem('wallfacer-theme') || 'auto';
+  if (mode === 'auto') document.documentElement.setAttribute('data-theme', getResolvedTheme('auto'));
+});
+
+// --- Settings panel ---
+function toggleSettings(e) {
+  e.stopPropagation();
+  document.getElementById('settings-panel').classList.toggle('hidden');
+}
+
+document.addEventListener('click', function(e) {
+  var panel = document.getElementById('settings-panel');
+  var btn = document.getElementById('settings-btn');
+  if (!panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.add('hidden');
+  }
+});
+
+// --- State ---
 let tasks = [];
 let currentTaskId = null;
 let logsAbort = null;
@@ -225,8 +470,8 @@ async function createTask() {
   const prompt = textarea.value.trim();
   if (!prompt) {
     textarea.focus();
-    textarea.classList.add('border-red-500');
-    setTimeout(() => textarea.classList.remove('border-red-500'), 2000);
+    textarea.style.borderColor = '#dc2626';
+    setTimeout(() => textarea.style.borderColor = '', 2000);
     return;
   }
   try {
@@ -408,7 +653,7 @@ function render() {
 
 function createCard(t) {
   const card = document.createElement('div');
-  card.className = 'card bg-slate-700/80 rounded-lg p-3 border border-slate-600';
+  card.className = 'card';
   card.dataset.id = t.id;
   card.onclick = () => openModal(t.id);
   updateCard(card, t);
@@ -428,16 +673,16 @@ function updateCard(card, t) {
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
-        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeClass}">${statusLabel}</span>
+        <span class="badge ${badgeClass}">${statusLabel}</span>
         ${t.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-slate-500" title="Timeout">${formatTimeout(t.timeout)}</span>
-        <span class="text-[10px] text-slate-500">${timeAgo(t.created_at)}</span>
+        <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
+        <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
       </div>
     </div>
-    <p class="text-sm text-slate-200 line-clamp-3">${escapeHtml(t.prompt)}</p>
-    ${t.result ? `<p class="text-xs text-slate-400 mt-1 line-clamp-2">${escapeHtml(t.result)}</p>` : ''}
+    <p class="text-sm line-clamp-3">${escapeHtml(t.prompt)}</p>
+    ${t.result ? `<p class="text-xs text-v-secondary mt-1 line-clamp-2">${escapeHtml(t.result)}</p>` : ''}
   `;
 }
 
@@ -461,7 +706,7 @@ async function openModal(id) {
   const task = tasks.find(t => t.id === id);
   if (!task) return;
 
-  document.getElementById('modal-badge').className = `px-2 py-0.5 rounded text-xs font-medium badge-${task.status}`;
+  document.getElementById('modal-badge').className = `badge badge-${task.status}`;
   document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   const editSection = document.getElementById('modal-edit-section');
@@ -532,7 +777,7 @@ async function openModal(id) {
     historySection.classList.remove('hidden');
     const historyList = document.getElementById('modal-history-list');
     historyList.innerHTML = task.prompt_history.map((p, i) =>
-      `<pre class="bg-slate-900/60 rounded-lg p-3 text-xs text-slate-400 border border-slate-700"><span class="text-slate-500 text-[10px]">#${i + 1}</span>\n${escapeHtml(p)}</pre>`
+      `<pre class="code-block text-xs" style="opacity:0.7;border:1px solid var(--border);"><span class="text-v-muted" style="font-size:10px;">#${i + 1}</span>\n${escapeHtml(p)}</pre>`
     ).join('');
   } else {
     historySection.classList.add('hidden');
@@ -555,20 +800,20 @@ async function openModal(id) {
       } else if (e.event_type === 'error') {
         detail = escapeHtml(data.error);
       }
-      const typeColors = {
-        state_change: 'text-blue-400',
-        output: 'text-green-400',
-        feedback: 'text-yellow-400',
-        error: 'text-red-400',
+      const typeClasses = {
+        state_change: 'ev-state',
+        output: 'ev-output',
+        feedback: 'ev-feedback',
+        error: 'ev-error',
       };
       return `<div class="flex items-start gap-2 text-xs">
-        <span class="text-slate-500 shrink-0">${time}</span>
-        <span class="${typeColors[e.event_type] || 'text-slate-400'} shrink-0">${e.event_type}</span>
-        <span class="text-slate-300">${detail}</span>
+        <span class="text-v-muted shrink-0">${time}</span>
+        <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${e.event_type}</span>
+        <span class="text-v-secondary">${detail}</span>
       </div>`;
     }).join('');
   } catch (e) {
-    document.getElementById('modal-events').innerHTML = '<span class="text-xs text-red-400">Failed to load events</span>';
+    document.getElementById('modal-events').innerHTML = '<span class="text-xs ev-error">Failed to load events</span>';
   }
 
   document.getElementById('modal').classList.remove('hidden');

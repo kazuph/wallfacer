@@ -174,10 +174,19 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 	log.Printf("runner: task %s auto commit-and-push (session=%s)", taskID, sessionID)
 
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
-		"result": "Auto-running /commit-and-push...",
+		"result": "Auto-running commit-and-push...",
 	})
 
-	output, _, _, err := r.runContainer(ctx, taskID, "Run /commit-and-push to commit all changes and push to the remote repository.", sessionID)
+	prompt := "Commit and push all changes. Check `git status` in each workspace directory. " +
+		"If there are uncommitted changes, stage them with `git add -A`, " +
+		"create a commit with a descriptive message summarizing the changes, " +
+		"and push to the remote. Report what you committed and pushed."
+
+	turns++
+	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
+	if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
+		log.Printf("runner: task %s save commit-and-push turn %d output: %v", taskID, turns, saveErr)
+	}
 	if err != nil {
 		log.Printf("runner: task %s commit-and-push error: %v", taskID, err)
 		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
@@ -186,18 +195,26 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 		return
 	}
 
+	log.Printf("runner: task %s commit-and-push result: %s", taskID, truncate(output.Result, 500))
+
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
 		"result":      output.Result,
 		"stop_reason": output.StopReason,
 		"session_id":  output.SessionID,
 	})
 
-	turns++
 	sid := sessionID
 	if output.SessionID != "" {
 		sid = output.SessionID
 	}
 	r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sid, output.StopReason, turns)
+	r.store.AccumulateTaskUsage(bgCtx, taskID, TaskUsage{
+		InputTokens:          output.Usage.InputTokens,
+		OutputTokens:         output.Usage.OutputTokens,
+		CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+		CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+		CostUSD:              output.TotalCostUSD,
+	})
 	log.Printf("runner: task %s commit-and-push completed", taskID)
 }
 

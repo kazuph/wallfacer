@@ -25,19 +25,19 @@ type TaskUsage struct {
 }
 
 type Task struct {
-	ID            uuid.UUID  `json:"id"`
-	Prompt        string     `json:"prompt"`
-	PromptHistory []string   `json:"prompt_history,omitempty"`
-	Status        string     `json:"status"`
-	SessionID     *string    `json:"session_id"`
-	Result        *string    `json:"result"`
-	StopReason    *string    `json:"stop_reason"`
-	Turns         int        `json:"turns"`
-	Timeout       int        `json:"timeout"`
-	Usage         TaskUsage  `json:"usage"`
-	Position      int        `json:"position"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID            uuid.UUID `json:"id"`
+	Prompt        string    `json:"prompt"`
+	PromptHistory []string  `json:"prompt_history,omitempty"`
+	Status        string    `json:"status"`
+	SessionID     *string   `json:"session_id"`
+	Result        *string   `json:"result"`
+	StopReason    *string   `json:"stop_reason"`
+	Turns         int       `json:"turns"`
+	Timeout       int       `json:"timeout"`
+	Usage         TaskUsage `json:"usage"`
+	Position      int       `json:"position"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type TaskEvent struct {
@@ -75,67 +75,11 @@ func NewStore(dir string) (*Store, error) {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 
-	if err := s.migrateFromLegacy(); err != nil {
-		return nil, fmt.Errorf("legacy migration: %w", err)
-	}
-
 	if err := s.loadAll(); err != nil {
 		return nil, fmt.Errorf("load store: %w", err)
 	}
 
 	return s, nil
-}
-
-// migrateFromLegacy converts a data.json file to the per-task directory layout.
-func (s *Store) migrateFromLegacy() error {
-	legacyPath := "data.json"
-	raw, err := os.ReadFile(legacyPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read legacy file: %w", err)
-	}
-
-	var old legacyStoreData
-	if err := json.Unmarshal(raw, &old); err != nil {
-		return fmt.Errorf("parse legacy file: %w", err)
-	}
-
-	log.Printf("migrating %d tasks from data.json to %s/", len(old.Tasks), s.dir)
-
-	// Index events by task ID.
-	eventsByTask := make(map[uuid.UUID][]TaskEvent)
-	for _, e := range old.Events {
-		eventsByTask[e.TaskID] = append(eventsByTask[e.TaskID], e)
-	}
-
-	for _, task := range old.Tasks {
-		taskDir := filepath.Join(s.dir, task.ID.String())
-		tracesDir := filepath.Join(taskDir, "traces")
-		if err := os.MkdirAll(tracesDir, 0755); err != nil {
-			return err
-		}
-
-		if err := atomicWriteJSON(filepath.Join(taskDir, "task.json"), task); err != nil {
-			return err
-		}
-
-		events := eventsByTask[task.ID]
-		sort.Slice(events, func(i, j int) bool { return events[i].ID < events[j].ID })
-		for seq, evt := range events {
-			name := fmt.Sprintf("%04d.json", seq+1)
-			if err := atomicWriteJSON(filepath.Join(tracesDir, name), evt); err != nil {
-				return err
-			}
-		}
-	}
-
-	if err := os.Rename(legacyPath, legacyPath+".bak"); err != nil {
-		return fmt.Errorf("rename legacy file: %w", err)
-	}
-	log.Printf("migration complete; data.json renamed to data.json.bak")
-	return nil
 }
 
 // loadAll scans the data directory and populates in-memory maps.
