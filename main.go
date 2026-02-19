@@ -3,10 +3,16 @@ package main
 import (
 	"context"
 	"embed"
+	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -15,25 +21,66 @@ import (
 var uiFiles embed.FS
 
 func main() {
-	addr := envOrDefault("ADDR", ":8080")
-	dataDir := envOrDefault("DATA_DIR", "data")
+	addr := flag.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
+	dataDir := flag.String("data", envOrDefault("DATA_DIR", "data"), "data directory")
+	containerCmd := flag.String("container", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"), "container runtime command")
+	sandboxImage := flag.String("image", envOrDefault("SANDBOX_IMAGE", "wallfacer:latest"), "sandbox container image")
+	envFile := flag.String("env", envOrDefault("ENV_FILE", ".env"), "env file for container (Claude token)")
+	noBrowser := flag.Bool("no-browser", false, "do not open browser on start")
 
-	store, err := NewStore(dataDir)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: wallfacer [flags] [workspace ...]\n\n")
+		fmt.Fprintf(os.Stderr, "Positional arguments:\n")
+		fmt.Fprintf(os.Stderr, "  workspace    directories to mount in the sandbox (default: current directory)\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	// Positional args are workspace directories.
+	workspaces := flag.Args()
+	if len(workspaces) == 0 {
+		cwd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("getwd: %v", err)
+		}
+		workspaces = []string{cwd}
+	}
+
+	// Resolve to absolute paths and validate.
+	for i, ws := range workspaces {
+		abs, err := filepath.Abs(ws)
+		if err != nil {
+			log.Fatalf("resolve workspace %q: %v", ws, err)
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			log.Fatalf("workspace %q: %v", abs, err)
+		}
+		if !info.IsDir() {
+			log.Fatalf("workspace %q is not a directory", abs)
+		}
+		workspaces[i] = abs
+	}
+
+	store, err := NewStore(*dataDir)
 	if err != nil {
 		log.Fatalf("store: %v", err)
 	}
 	defer store.Close()
-	log.Printf("store loaded from %s/", dataDir)
+	log.Printf("store loaded from %s/", *dataDir)
 
 	// Recover orphaned in_progress tasks from a previous server crash.
 	recoverOrphanedTasks(store)
 
 	runner := NewRunner(store, RunnerConfig{
-		Command:      envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"),
-		SandboxImage: envOrDefault("SANDBOX_IMAGE", "wallfacer:latest"),
-		EnvFile:      envOrDefault("ENV_FILE", ".env"),
-		Workspaces:   envOrDefault("WORKSPACES", ""),
+		Command:      *containerCmd,
+		SandboxImage: *sandboxImage,
+		EnvFile:      *envFile,
+		Workspaces:   strings.Join(workspaces, " "),
 	})
+
+	log.Printf("workspaces: %s", strings.Join(workspaces, ", "))
 
 	handler := NewHandler(store, runner)
 
@@ -119,8 +166,16 @@ func main() {
 		handler.StreamLogs(w, r, id)
 	})
 
-	log.Printf("listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if !*noBrowser {
+		url := "http://localhost" + *addr
+		if !strings.HasPrefix(*addr, ":") {
+			url = "http://" + *addr
+		}
+		go openBrowser(url)
+	}
+
+	log.Printf("listening on %s", *addr)
+	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }
@@ -130,6 +185,19 @@ func envOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func openBrowser(url string) {
+	var cmd string
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = "open"
+	case "linux":
+		cmd = "xdg-open"
+	default:
+		return
+	}
+	exec.Command(cmd, url).Start()
 }
 
 func recoverOrphanedTasks(store *Store) {
