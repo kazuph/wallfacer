@@ -369,6 +369,42 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	return s.saveTask(id, t)
 }
 
+func (s *Store) ResumeTask(_ context.Context, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+
+	t.Status = "in_progress"
+	t.UpdatedAt = time.Now()
+	return s.saveTask(id, t)
+}
+
+// SaveTurnOutput persists raw stdout/stderr for a given turn to the outputs directory.
+func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error {
+	outputsDir := filepath.Join(s.dir, taskID.String(), "outputs")
+	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+		return fmt.Errorf("create outputs dir: %w", err)
+	}
+
+	name := fmt.Sprintf("turn-%04d.json", turn)
+	if err := os.WriteFile(filepath.Join(outputsDir, name), stdout, 0644); err != nil {
+		return fmt.Errorf("write stdout: %w", err)
+	}
+
+	if len(stderr) > 0 {
+		stderrName := fmt.Sprintf("turn-%04d.stderr.txt", turn)
+		if err := os.WriteFile(filepath.Join(outputsDir, stderrName), stderr, 0644); err != nil {
+			return fmt.Errorf("write stderr: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

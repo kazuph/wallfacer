@@ -73,7 +73,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 		turns++
 		log.Printf("runner: task %s turn %d (session=%s, timeout=%s)", taskID, turns, sessionID, timeout)
 
-		output, err := r.runContainer(ctx, taskID, prompt, sessionID)
+		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
+		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
+			log.Printf("runner: task %s save turn %d output: %v", taskID, turns, saveErr)
+		}
 		if err != nil {
 			log.Printf("runner: task %s container error: %v", taskID, err)
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
@@ -142,7 +145,7 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 		"result": "Auto-running /commit-and-push...",
 	})
 
-	output, err := r.runContainer(ctx, taskID, "Run /commit-and-push to commit all changes and push to the remote repository.", sessionID)
+	output, _, _, err := r.runContainer(ctx, taskID, "Run /commit-and-push to commit all changes and push to the remote repository.", sessionID)
 	if err != nil {
 		log.Printf("runner: task %s commit-and-push error: %v", taskID, err)
 		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
@@ -166,7 +169,7 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 	log.Printf("runner: task %s commit-and-push completed", taskID)
 }
 
-func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, sessionID string) (*claudeOutput, error) {
+func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, sessionID string) (*claudeOutput, []byte, []byte, error) {
 	containerName := "wallfacer-" + taskID.String()
 
 	// Remove any leftover container from a previous interrupted run.
@@ -211,21 +214,21 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 	log.Printf("runner: exec %s %s", r.command, strings.Join(args, " "))
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(stdout.String(), 500))
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(stdout.String(), 500))
 		}
-		return nil, fmt.Errorf("exec container: %w", err)
+		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", err)
 	}
 
 	var output claudeOutput
 	raw := strings.TrimSpace(stdout.String())
 	if raw == "" {
-		return nil, fmt.Errorf("empty output from container")
+		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
 	}
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
-		return nil, fmt.Errorf("parse output: %w (raw: %s)", err, truncate(raw, 200))
+		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse output: %w (raw: %s)", err, truncate(raw, 200))
 	}
 
-	return &output, nil
+	return &output, stdout.Bytes(), stderr.Bytes(), nil
 }
 
 func truncate(s string, n int) string {

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -198,6 +200,57 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		events = []TaskEvent{}
 	}
 	writeJSON(w, http.StatusOK, events)
+}
+
+func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != "failed" {
+		http.Error(w, "only failed tasks can be resumed", http.StatusBadRequest)
+		return
+	}
+	if task.SessionID == nil || *task.SessionID == "" {
+		http.Error(w, "task has no session to resume", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.ResumeTask(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		"from": "failed",
+		"to":   "in_progress",
+	})
+
+	go h.runner.Run(id, "", *task.SessionID)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+}
+
+func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UUID, filename string) {
+	// Validate filename to prevent path traversal.
+	if strings.Contains(filename, "/") || strings.Contains(filename, "..") {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	path := filepath.Join(h.store.dir, id.String(), "outputs", filename)
+	if _, err := os.Stat(path); err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if strings.HasSuffix(filename, ".json") {
+		w.Header().Set("Content-Type", "application/json")
+	} else {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	}
+	http.ServeFile(w, r, path)
 }
 
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
