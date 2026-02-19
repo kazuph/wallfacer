@@ -152,6 +152,22 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 	}
 }
 
+// CommitAndPush creates its own timeout context and runs commit-and-push for a task.
+func (r *Runner) CommitAndPush(taskID uuid.UUID, sessionID string) {
+	task, err := r.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		log.Printf("runner: commit-and-push get task %s: %v", taskID, err)
+		return
+	}
+	timeout := time.Duration(task.Timeout) * time.Minute
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	r.commitAndPush(ctx, taskID, sessionID, task.Turns)
+}
+
 // commitAndPush runs an additional container turn to commit and push changes.
 func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID string, turns int) {
 	bgCtx := context.Background()

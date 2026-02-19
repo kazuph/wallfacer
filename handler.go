@@ -202,6 +202,34 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	writeJSON(w, http.StatusOK, events)
 }
 
+func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != "waiting" {
+		http.Error(w, "only waiting tasks can be completed", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.UpdateTaskStatus(r.Context(), id, "done"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		"from": "waiting",
+		"to":   "done",
+	})
+
+	if task.SessionID != nil && *task.SessionID != "" {
+		go h.runner.CommitAndPush(id, *task.SessionID)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "completed"})
+}
+
 func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
