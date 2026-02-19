@@ -1,14 +1,15 @@
+SHELL   := /bin/bash
 PODMAN  := /opt/podman/bin/podman
 IMAGE   := wallfacer:latest
 NAME    := wallfacer
 TRACE_DIR := observability
 
-# Space-separated list of folders to mount under /workspace/<basename>
-WORKSPACES ?= $(CURDIR)
-
 # Load .env if it exists
 -include sandbox/.env
 export
+
+# Space-separated list of folders to mount under /workspace/<basename>
+WORKSPACES ?= $(CURDIR)
 
 # Generate -v flags: /path/to/foo -> -v /path/to/foo:/workspace/foo:z
 VOLUME_MOUNTS := $(foreach ws,$(WORKSPACES),-v $(ws):/workspace/$(notdir $(ws)):z)
@@ -26,21 +27,23 @@ ifndef PROMPT
 endif
 	@mkdir -p $(TRACE_DIR)
 	$(eval TRACE_FILE := $(TRACE_DIR)/$(shell date +%Y%m%d_%H%M%S)_$(shell echo "$(PROMPT)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$$//' | cut -c1-50).jsonl)
-	$(PODMAN) run --rm -it \
+	@$(PODMAN) run --rm -it \
 		--name $(NAME) \
-		-e CLAUDE_CODE_OAUTH_TOKEN \
+		-e ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
 		$(VOLUME_MOUNTS) \
 		-v claude-config:/home/claude/.claude \
 		-w /workspace \
 		$(IMAGE) -p "$(PROMPT)" --verbose --output-format stream-json \
-		| tee $(TRACE_FILE)
-	@echo "\nTrace saved to $(TRACE_FILE)"
+		| tee $(TRACE_FILE) ; \
+		rc=$${PIPESTATUS[0]} ; \
+		echo "\nTrace saved to $(TRACE_FILE)" ; \
+		exit $$rc
 
 # Interactive TUI mode
 interactive:
 	$(PODMAN) run --rm -it \
 		--name $(NAME) \
-		-e CLAUDE_CODE_OAUTH_TOKEN \
+		-e ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
 		$(VOLUME_MOUNTS) \
 		-v claude-config:/home/claude/.claude \
 		-w /workspace \
@@ -50,7 +53,7 @@ interactive:
 shell:
 	$(PODMAN) run --rm -it \
 		--name $(NAME) \
-		-e CLAUDE_CODE_OAUTH_TOKEN \
+		-e ANTHROPIC_API_KEY -e CLAUDE_CODE_OAUTH_TOKEN \
 		$(VOLUME_MOUNTS) \
 		-v claude-config:/home/claude/.claude \
 		-w /workspace \
