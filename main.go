@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	fsLib "io/fs"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -281,16 +282,27 @@ func runServer(configDir string, args []string) {
 		handler.StreamLogs(w, r, id)
 	})
 
-	if !*noBrowser {
-		url := "http://localhost" + *addr
-		if !strings.HasPrefix(*addr, ":") {
-			url = "http://" + *addr
+	host, _, _ := net.SplitHostPort(*addr)
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		logMain.Warn("requested address unavailable, finding free port", "addr", *addr, "error", err)
+		ln, err = net.Listen("tcp", net.JoinHostPort(host, "0"))
+		if err != nil {
+			fatal(logMain, "listen", "error", err)
 		}
-		go openBrowser(url)
 	}
 
-	logMain.Info("listening", "addr", *addr)
-	if err := http.ListenAndServe(*addr, loggingMiddleware(mux)); err != nil {
+	actualPort := ln.Addr().(*net.TCPAddr).Port
+	if !*noBrowser {
+		browserHost := host
+		if browserHost == "" {
+			browserHost = "localhost"
+		}
+		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, actualPort))
+	}
+
+	logMain.Info("listening", "addr", ln.Addr().String())
+	if err := http.Serve(ln, loggingMiddleware(mux)); err != nil {
 		fatal(logMain, "server", "error", err)
 	}
 }
