@@ -2,6 +2,14 @@
 
 A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as cards in a web UI, drag them to "In Progress" to trigger Claude Code execution in a sandbox container, and inspect results when done.
 
+<table>
+  <tr>
+    <td><img src="./images/overview.png" alt="Overview" width="100%"></td>
+    <td><img src="./images/inprogress.png" alt="In Progress" width="100%"></td>
+    <td><img src="./images/waiting.png" alt="Waiting" width="100%"></td>
+  </tr>
+</table>
+
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+
