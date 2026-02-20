@@ -146,6 +146,24 @@ func hasCommitsAheadOf(worktreePath, baseBranch string) (bool, error) {
 	return n > 0, nil
 }
 
+// stashIfDirty stashes uncommitted changes in worktreePath if the working tree
+// is dirty. Returns true if a stash entry was created.
+func stashIfDirty(worktreePath string) bool {
+	out, _ := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+	if len(strings.TrimSpace(string(out))) == 0 {
+		return false
+	}
+	err := exec.Command("git", "-C", worktreePath, "stash", "--include-untracked").Run()
+	return err == nil
+}
+
+// stashPop restores the most recent stash entry. Errors are logged but not fatal.
+func stashPop(worktreePath string) {
+	if out, err := exec.Command("git", "-C", worktreePath, "stash", "pop").CombinedOutput(); err != nil {
+		logGit.Warn("stash pop failed", "path", worktreePath, "error", err, "output", string(out))
+	}
+}
+
 // isConflictOutput reports whether git output text indicates a merge conflict.
 func isConflictOutput(s string) bool {
 	return strings.Contains(s, "CONFLICT") ||

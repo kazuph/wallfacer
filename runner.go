@@ -347,6 +347,9 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 			"result": fmt.Sprintf("Rebasing %s onto %s (%d new commit(s))...", filepath.Base(repoPath), defBranch, n),
 		})
 
+		// Stash uncommitted changes so rebase can proceed on a clean tree.
+		stashed := stashIfDirty(worktreePath)
+
 		var rebaseErr error
 		for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
 			rebaseErr = rebaseOntoDefault(repoPath, worktreePath)
@@ -366,6 +369,11 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 				rebaseErr = fmt.Errorf("conflict resolution failed: %w", resolveErr)
 				break
 			}
+		}
+
+		// Restore stashed changes regardless of rebase outcome.
+		if stashed {
+			stashPop(worktreePath)
 		}
 
 		if rebaseErr != nil {
