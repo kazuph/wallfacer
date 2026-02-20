@@ -490,3 +490,26 @@ Builds and vets clean. Here's what the migration does:
 Subsequent starts find nothing left to migrate (UUIDs are gone from `baseDir`), so it's a no-op. The 16-char fingerprint subdirectories that future workspace combinations create are ignored since they don't parse as UUIDs.
 
 ---
+
+## Task: c9e1e94d
+
+**Date**: 2026-02-21 01:02:59  
+**Branch**: task/c9e1e94d  
+**Commit**: `714ff44e85c5234ecaeceeb7627230b5c9c15efc`
+
+**Prompt**:
+> title generation seems to fail with error 
+> 
+> 01:01:53.185  DBG  runner    exec  │  cmd=/opt/podman/bin/podman  args="run --rm --network=host --name wallfacer-c0c07274-7534-48cf-97f2-753d23790fba --env-file /Users/changkun/.wallfacer/.env -v claude-config:/home/claude/.claude -v /Users/changkun/.wallfacer/instruction…"
+> 01:01:54.491  WRN  runner    title generation failed  │  task=c0c07274  error="exit status 1"  stderr="Error: When using --print, --output-format=stream-json requires --verbose\n"
+> 
+> 
+> 
+> fix this
+
+**Result**:
+The parsing logic already handles NDJSON by iterating lines in reverse and looking for the last valid JSON object — that's correct for `stream-json` output. The fix is complete.
+
+The root cause: Claude Code's `--output-format=stream-json` requires `--verbose` when using `--print` mode. Adding `--verbose` satisfies that requirement.
+
+---
