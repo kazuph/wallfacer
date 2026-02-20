@@ -333,3 +333,21 @@ The "Wallfacer" title now uses:
 - Dropped the blue color, uppercase transform, and wide letter-spacing in favor of a more polished, editorial feel
 
 ---
+
+## Task: e767d024
+
+**Date**: 2026-02-21 00:29:12  
+**Branch**: task/e767d024  
+**Commit**: `ea5c0ea83126421936f1878040216a6da9846b7a`
+
+**Prompt**:
+> the left-right side by side diff view for task card details in the waiting column seems broken. it shows only one top down and show diffs at the bottom. there is a wierd error yello box without anything inside which i expect to hide it if not error
+
+**Result**:
+Two fixes applied:
+
+**Yellow box** (`styles.css`): The CSS `#modal-diff-behind { display: flex }` used ID-selector specificity (1,0,0), which beats Tailwind's `.hidden { display: none }` (0,1,0), so the yellow box always rendered even when empty. Fixed by splitting the rule — `display: flex` now only applies via `#modal-diff-behind:not(.hidden)`, while the base `#modal-diff-behind` rule only contains the visual/layout properties.
+
+**Side-by-side layout** (`modal.js`): Rather than relying solely on the CSS selector `.modal-wide #modal-body { display: flex }` (which could lose to Tailwind CDN's later-injected stylesheet in the cascade), the layout is now also forced directly via `modalBody.style.display = 'flex'` inline style. Inline styles win over any CSS cascade. Cleared in both the `else` branch and `closeModal` so it doesn't bleed into non-wide modal opens.
+
+---
