@@ -173,10 +173,27 @@ func (r *Runner) pruneOrphanedWorktrees(store *Store) {
 func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
 	bgCtx := context.Background()
 
+	// Guard: if this goroutine returns without explicitly setting the task
+	// status (panic, early error), move to "failed" so the task doesn't
+	// stay stuck in "in_progress" forever.
+	statusSet := false
+	defer func() {
+		if p := recover(); p != nil {
+			logRunner.Error("run panic", "task", taskID, "panic", p)
+		}
+		if !statusSet {
+			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
+				"from": "in_progress",
+				"to":   "failed",
+			})
+		}
+	}()
+
 	task, err := r.store.GetTask(bgCtx, taskID)
 	if err != nil {
 		logRunner.Error("get task", "task", taskID, "error", err)
-		return
+		return // defer moves to "failed"
 	}
 
 	// Apply per-task total timeout across all turns.
@@ -196,6 +213,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		worktreePaths, branchName, err = r.setupWorktrees(taskID)
 		if err != nil {
 			logRunner.Error("setup worktrees", "task", taskID, "error", err)
+			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
 			r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{"error": err.Error()})
@@ -224,8 +242,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			// Don't overwrite a cancelled status — the cancel handler may have
 			// killed the container and already transitioned the task.
 			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == "cancelled" {
+				statusSet = true
 				return
 			}
+			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{"error": err.Error()})
@@ -254,6 +274,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		})
 
 		if output.IsError {
+			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
 				"from": "in_progress", "to": "failed",
@@ -263,6 +284,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		switch output.StopReason {
 		case "end_turn":
+			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, "done")
 			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
 				"from": "in_progress", "to": "done",
@@ -279,6 +301,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		default:
 			// Empty or unknown stop_reason — waiting for user feedback.
 			// Do NOT clean up worktrees; task may resume.
+			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
 				"from": "in_progress", "to": "waiting",
@@ -310,10 +333,28 @@ func (r *Runner) Commit(taskID uuid.UUID, sessionID string) {
 // unrecoverable failure it is moved to "failed".
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 	bgCtx := context.Background()
+
+	// Guard: if this goroutine returns without explicitly setting the task
+	// status (panic, early error, unexpected path), restore prevStatus so
+	// the task doesn't stay stuck in "in_progress" forever.
+	statusSet := false
+	defer func() {
+		if p := recover(); p != nil {
+			logRunner.Error("sync panic", "task", taskID, "panic", p)
+		}
+		if !statusSet {
+			r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
+			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
+				"from": "in_progress",
+				"to":   prevStatus,
+			})
+		}
+	}()
+
 	task, err := r.store.GetTask(bgCtx, taskID)
 	if err != nil {
 		logRunner.Error("sync: get task", "task", taskID, "error", err)
-		return
+		return // defer restores prevStatus
 	}
 
 	timeout := time.Duration(task.Timeout) * time.Minute
@@ -330,6 +371,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 	for repoPath, worktreePath := range task.WorktreePaths {
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
+			statusSet = true
 			r.failSync(bgCtx, taskID, sessionID, task.Turns,
 				fmt.Sprintf("defaultBranch for %s: %v", filepath.Base(repoPath), err))
 			return
@@ -377,6 +419,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 		}
 
 		if rebaseErr != nil {
+			statusSet = true
 			r.failSync(bgCtx, taskID, sessionID, task.Turns,
 				fmt.Sprintf("sync failed for %s: %v", filepath.Base(repoPath), rebaseErr))
 			return
@@ -387,6 +430,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 		})
 	}
 
+	statusSet = true
 	r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
 	r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
 		"from": "in_progress",
