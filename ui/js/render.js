@@ -1,5 +1,47 @@
 // --- Board rendering ---
 
+const diffCache = new Map(); // taskId -> {diff: string, updatedAt: string} | 'loading'
+
+function renderDiffInto(el, diff) {
+  if (!diff) {
+    el.innerHTML = '<span style="color:var(--text-muted)">no changes</span>';
+    return;
+  }
+  const lines = diff.split('\n');
+  el.innerHTML = lines.map(line => {
+    const escaped = escapeHtml(line);
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      return `<span class="diff-add">${escaped}</span>`;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      return `<span class="diff-del">${escaped}</span>`;
+    } else if (line.startsWith('@@')) {
+      return `<span class="diff-hunk">${escaped}</span>`;
+    } else if (line.startsWith('diff ') || line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('index ') || line.startsWith('Binary ')) {
+      return `<span class="diff-header">${escaped}</span>`;
+    }
+    return escaped;
+  }).join('\n');
+}
+
+async function fetchDiff(card, taskId, updatedAt) {
+  const cached = diffCache.get(taskId);
+  if (cached === 'loading') return;
+  if (cached && cached.updatedAt === updatedAt) {
+    const diffEl = card.querySelector('[data-diff]');
+    if (diffEl) renderDiffInto(diffEl, cached.diff);
+    return;
+  }
+  diffCache.set(taskId, 'loading');
+  try {
+    const data = await api(`/api/tasks/${taskId}/diff`);
+    diffCache.set(taskId, { diff: data.diff, updatedAt });
+    const latestEl = card.querySelector('[data-diff]');
+    if (latestEl) renderDiffInto(latestEl, data.diff);
+  } catch {
+    diffCache.delete(taskId);
+  }
+}
+
 function render() {
   const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [] };
   for (const t of tasks) {
@@ -44,6 +86,10 @@ function render() {
       if (el.children[i] !== card) {
         el.insertBefore(card, el.children[i] || null);
       }
+      // Load diff for waiting tasks that have worktrees
+      if (t.status === 'waiting' && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+        fetchDiff(card, t.id, t.updated_at);
+      }
     }
   }
 
@@ -77,6 +123,7 @@ function updateCard(card, t) {
   const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
+  const showDiff = t.status === 'waiting' && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
@@ -97,5 +144,6 @@ function updateCard(card, t) {
     ${t.result ? `
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
     ` : ''}
+    ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
   `;
 }

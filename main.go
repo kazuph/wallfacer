@@ -234,6 +234,15 @@ func runServer(configDir string, args []string) {
 		handler.ServeOutput(w, r, id, r.PathValue("filename"))
 	})
 
+	mux.HandleFunc("GET /api/tasks/{id}/diff", func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, "invalid task id", http.StatusBadRequest)
+			return
+		}
+		handler.TaskDiff(w, r, id)
+	})
+
 	mux.HandleFunc("GET /api/tasks/{id}/logs", func(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))
 		if err != nil {

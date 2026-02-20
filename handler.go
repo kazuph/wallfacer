@@ -588,6 +588,35 @@ func renderStreamJSON(w io.Writer, data []byte) {
 	}
 }
 
+func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if len(task.WorktreePaths) == 0 {
+		writeJSON(w, http.StatusOK, map[string]string{"diff": ""})
+		return
+	}
+
+	var combined strings.Builder
+	for repoPath, worktreePath := range task.WorktreePaths {
+		defBranch, err := defaultBranch(repoPath)
+		if err != nil {
+			continue
+		}
+		// Show all changes in worktree vs default branch (committed + uncommitted).
+		out, _ := exec.CommandContext(r.Context(), "git", "-C", worktreePath, "diff", defBranch).Output()
+		if len(out) > 0 {
+			if len(task.WorktreePaths) > 1 {
+				fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
+			}
+			combined.Write(out)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"diff": combined.String()})
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
