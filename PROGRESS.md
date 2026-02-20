@@ -549,3 +549,39 @@ Here's what was changed:
 - The git SSE stream will naturally refresh `behin...
 
 ---
+
+## Task: a53aaa87
+
+**Date**: 2026-02-21 01:18:33  
+**Branch**: task/a53aaa87  
+**Commit**: `af4c2368b07f92ce3076efc63480e19bd56cae68`
+
+**Prompt**:
+> in the system setting, add a button to visit all task cards and check if a task has a title created. if not generate title for them.
+> 
+> the visit all should have a input selection to allow limit the amount of workload, e.g. default select 10 tasks for title generation
+
+**Result**:
+Everything is in place. Here's a summary of the changes made:
+
+**Backend (`handler.go`)**
+- Added `GenerateMissingTitles` handler (`POST /api/tasks/generate-titles?limit=N`)
+  - Fetches all tasks (including archived), filters to those with empty `Title`
+  - Respects a `limit` query param (default 10; `0` = unlimited/all)
+  - Fires `runner.GenerateTitle()` goroutines for each selected task
+  - Returns `{ queued: N, total_without_title: M }` as JSON
+- Added `strconv` to imports
+
+**Backend (`main.go`)**
+- Registered the new route: `POST /api/tasks/generate-titles`
+
+**Frontend (`ui/index.html`)**
+- Added a "Task Titles" section in the settings panel with:
+  - A `<select>` for the batch limit (5 / **10** / 25 / 50 / All)
+  - A "Generate Missing" button
+  - A status message area that shows how many were queued
+
+**Frontend (`ui/js/tasks.js`)**
+- Added `generateMissingTitles()` — reads the limit selector, calls the API, and displays the result (or an error) in the status area. The button is ...
+
+---
