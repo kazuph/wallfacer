@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
 	"time"
@@ -71,7 +70,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 
 	task, err := r.store.GetTask(bgCtx, taskID)
 	if err != nil {
-		log.Printf("runner: get task %s: %v", taskID, err)
+		logRunner.Error("get task", "task", taskID, "error", err)
 		return
 	}
 
@@ -87,14 +86,14 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 
 	for {
 		turns++
-		log.Printf("runner: task %s turn %d (session=%s, timeout=%s)", taskID, turns, sessionID, timeout)
+		logRunner.Info("turn", "task", taskID, "turn", turns, "session", sessionID, "timeout", timeout)
 
 		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
 		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
-			log.Printf("runner: task %s save turn %d output: %v", taskID, turns, saveErr)
+			logRunner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
 		if err != nil {
-			log.Printf("runner: task %s container error: %v", taskID, err)
+			logRunner.Error("container error", "task", taskID, "error", err)
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{"error": err.Error()})
@@ -144,7 +143,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 			return
 
 		case "max_tokens", "pause_turn":
-			log.Printf("runner: task %s auto-continuing (stop_reason=%s)", taskID, output.StopReason)
+			logRunner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
 			continue
 
@@ -163,7 +162,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 func (r *Runner) Commit(taskID uuid.UUID, sessionID string) {
 	task, err := r.store.GetTask(context.Background(), taskID)
 	if err != nil {
-		log.Printf("runner: commit get task %s: %v", taskID, err)
+		logRunner.Error("commit get task", "task", taskID, "error", err)
 		return
 	}
 	timeout := time.Duration(task.Timeout) * time.Minute
@@ -199,7 +198,7 @@ func (r *Runner) workspacePaths() []string {
 // commit runs an additional container turn to stage and commit changes.
 func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string, turns int) {
 	bgCtx := context.Background()
-	log.Printf("runner: task %s auto-commit (session=%s)", taskID, sessionID)
+	logRunner.Info("auto-commit", "task", taskID, "session", sessionID)
 
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
 		"result": "Auto-running commit...",
@@ -225,17 +224,17 @@ func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string,
 	turns++
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
 	if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
-		log.Printf("runner: task %s save commit turn %d output: %v", taskID, turns, saveErr)
+		logRunner.Error("save commit turn output", "task", taskID, "turn", turns, "error", saveErr)
 	}
 	if err != nil {
-		log.Printf("runner: task %s commit error: %v", taskID, err)
+		logRunner.Error("commit error", "task", taskID, "error", err)
 		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
 			"error": "commit failed: " + err.Error(),
 		})
 		return
 	}
 
-	log.Printf("runner: task %s commit result: %s", taskID, truncate(output.Result, 500))
+	logRunner.Info("commit result", "task", taskID, "result", truncate(output.Result, 500))
 
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
 		"result":      output.Result,
@@ -252,7 +251,7 @@ func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string,
 		CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 		CostUSD:              output.TotalCostUSD,
 	})
-	log.Printf("runner: task %s commit completed", taskID)
+	logRunner.Info("commit completed", "task", taskID)
 }
 
 func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, sessionID string) (*claudeOutput, []byte, []byte, error) {
@@ -297,7 +296,7 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	log.Printf("runner: exec %s %s", r.command, strings.Join(args, " "))
+	logRunner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(stdout.String(), 500))

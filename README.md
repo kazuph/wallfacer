@@ -2,6 +2,22 @@
 
 A Kanban task runner for Claude Code. Create tasks as cards in a web UI, drag them to In Progress to trigger Claude Code execution in a sandbox, and inspect results when done.
 
+## Origin Story
+
+It started innocently enough. A developer, keyboard in hand, neurons firing, writing actual code like some kind of 2023 caveman. Line by line. Bracket by bracket. The usual suffering.
+
+Then Claude Code arrived. Suddenly the developer was mostly writing *task descriptions* instead of code. The ratio of English words to Go syntax in daily output shifted dramatically. Productivity soared. Understanding of what was actually happening in the codebase plummeted at roughly the same rate. A fair trade.
+
+The project grew. A Go server. A Kanban board. A sandbox container. A whole little world for running Claude Code tasks. And somewhere around the point where dragging a card from Backlog to In Progress actually worked, a horrifying realization set in:
+
+*The tool was ready to use.*
+
+So the developer opened Wallfacer, created a task card that said "add retry logic to failed tasks," dragged it to In Progress, and watched Claude Code — running inside a Wallfacer sandbox — implement a feature for Wallfacer.
+
+The commits started coming from inside the house.
+
+Wallfacer now develops Wallfacer. Whether this is elegant bootstrapping or the opening scene of a cautionary film is left as an exercise for the reader. Either way, the developer has a lot more time for task *writing* now, which is definitely a form of work and not just thinking of things to make Claude do.
+
 ## Architecture
 
 ```

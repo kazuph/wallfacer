@@ -145,11 +145,11 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 
 	var b strings.Builder
 
-	// Timestamp: HH:MM:SS.mmm  (dim gray)
-	b.WriteString(col(ansiDim+ansiGray, r.Time.Format("15:04:05.000")))
+	// Timestamp: HH:MM:SS.mmm — dim, de-emphasized.
+	b.WriteString(col(ansiDim, r.Time.Format("15:04:05.000")))
 	b.WriteString("  ")
 
-	// Level: 3-char abbreviation with color.
+	// Level: 3-char badge with color.
 	switch r.Level {
 	case slog.LevelDebug:
 		b.WriteString(col(ansiGray, "DBG"))
@@ -162,23 +162,26 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 	b.WriteString("  ")
 
-	// Component: fixed 8-char column, cyan.
-	b.WriteString(col(ansiCyan, fmt.Sprintf("%-8s", component)))
+	// Component: fixed 8-char column, dim cyan (de-emphasised label).
+	b.WriteString(col(ansiCyan+ansiDim, fmt.Sprintf("%-8s", component)))
 	b.WriteString("  ")
 
-	// Message.
-	b.WriteString(r.Message)
+	// Message: bold so it stands out from surrounding metadata.
+	b.WriteString(col(ansiBold, r.Message))
 
-	// Additional key=value pairs; error values are highlighted red.
-	for _, a := range extra {
-		b.WriteString("  ")
-		b.WriteString(col(ansiDim, a.Key))
-		b.WriteByte('=')
-		v := fmt.Sprintf("%v", a.Value.Resolve().Any())
-		if a.Key == "error" {
-			b.WriteString(col(ansiRed, v))
-		} else {
-			b.WriteString(v)
+	// Key=value pairs, separated from the message by a dim pipe.
+	if len(extra) > 0 {
+		b.WriteString(col(ansiDim, "  │"))
+		for _, a := range extra {
+			b.WriteString("  ")
+			// dim key= so that values are the visual focus.
+			b.WriteString(col(ansiDim, a.Key+"="))
+			v := prettyValue(a.Value.Resolve())
+			if a.Key == "error" {
+				b.WriteString(col(ansiRed+ansiBold, v))
+			} else {
+				b.WriteString(v)
+			}
 		}
 	}
 
@@ -188,4 +191,35 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	defer h.mu.Unlock()
 	_, err := fmt.Fprint(h.w, b.String())
 	return err
+}
+
+// prettyValue formats a slog.Value for display.
+// String values that contain whitespace, quotes, or '=' are quoted so that
+// multi-word values cannot be mistaken for separate key=value tokens.
+func prettyValue(v slog.Value) string {
+	if v.Kind() == slog.KindString {
+		s := v.String()
+		if needsQuoting(s) {
+			return fmt.Sprintf("%q", s)
+		}
+		return s
+	}
+	s := fmt.Sprintf("%v", v.Any())
+	if needsQuoting(s) {
+		return fmt.Sprintf("%q", s)
+	}
+	return s
+}
+
+// needsQuoting reports whether s must be wrapped in quotes for visual clarity.
+func needsQuoting(s string) bool {
+	if s == "" {
+		return true
+	}
+	for _, r := range s {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '=' {
+			return true
+		}
+	}
+	return false
 }

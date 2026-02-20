@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -53,10 +52,10 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("git: push %s", req.Workspace)
+	logGit.Info("push", "workspace", req.Workspace)
 	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "push").CombinedOutput()
 	if err != nil {
-		log.Printf("git: push %s failed: %v", req.Workspace, err)
+		logGit.Error("push failed", "workspace", req.Workspace, "error", err)
 		http.Error(w, string(out), http.StatusInternalServerError)
 		return
 	}

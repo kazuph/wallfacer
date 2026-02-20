@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	fsLib "io/fs"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,7 +30,7 @@ func printUsage() {
 func main() {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("home dir: %v", err)
+		fatal(logMain, "home dir", "error", err)
 	}
 	configDir := filepath.Join(home, ".wallfacer")
 
@@ -57,6 +56,7 @@ func main() {
 func runServer(configDir string, args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
+	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" (colored, human-friendly) or "json" (structured JSON for log aggregators)`)
 	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"), "container runtime command")
@@ -74,6 +74,9 @@ func runServer(configDir string, args []string) {
 	}
 	fs.Parse(args)
 
+	// Re-initialize loggers with the format chosen by the user.
+	initLogger(*logFormat)
+
 	// Auto-initialize config directory and .env template.
 	initConfigDir(configDir, *envFile)
 
@@ -82,7 +85,7 @@ func runServer(configDir string, args []string) {
 	if len(workspaces) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
-			log.Fatalf("getwd: %v", err)
+			fatal(logMain, "getwd", "error", err)
 		}
 		workspaces = []string{cwd}
 	}
@@ -91,24 +94,24 @@ func runServer(configDir string, args []string) {
 	for i, ws := range workspaces {
 		abs, err := filepath.Abs(ws)
 		if err != nil {
-			log.Fatalf("resolve workspace %q: %v", ws, err)
+			fatal(logMain, "resolve workspace", "workspace", ws, "error", err)
 		}
 		info, err := os.Stat(abs)
 		if err != nil {
-			log.Fatalf("workspace %q: %v", abs, err)
+			fatal(logMain, "workspace", "path", abs, "error", err)
 		}
 		if !info.IsDir() {
-			log.Fatalf("workspace %q is not a directory", abs)
+			fatal(logMain, "workspace is not a directory", "path", abs)
 		}
 		workspaces[i] = abs
 	}
 
 	store, err := NewStore(*dataDir)
 	if err != nil {
-		log.Fatalf("store: %v", err)
+		fatal(logMain, "store", "error", err)
 	}
 	defer store.Close()
-	log.Printf("store loaded from %s/", *dataDir)
+	logMain.Info("store loaded", "path", *dataDir)
 
 	// Recover orphaned in_progress tasks from a previous server crash.
 	recoverOrphanedTasks(store)
@@ -120,7 +123,7 @@ func runServer(configDir string, args []string) {
 		Workspaces:   strings.Join(workspaces, " "),
 	})
 
-	log.Printf("workspaces: %s", strings.Join(workspaces, ", "))
+	logMain.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
 	handler := NewHandler(store, runner)
 
@@ -235,9 +238,9 @@ func runServer(configDir string, args []string) {
 		go openBrowser(url)
 	}
 
-	log.Printf("listening on %s", *addr)
+	logMain.Info("listening", "addr", *addr)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
-		log.Fatalf("server: %v", err)
+		fatal(logMain, "server", "error", err)
 	}
 }
 
@@ -305,15 +308,15 @@ func runEnvCheck(configDir string) {
 
 func initConfigDir(configDir, envFile string) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		log.Fatalf("create config dir: %v", err)
+		fatal(logMain, "create config dir", "error", err)
 	}
 
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
 		content := "CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
-			log.Fatalf("create env file: %v", err)
+			fatal(logMain, "create env file", "error", err)
 		}
-		log.Printf("created %s — edit it and set your CLAUDE_CODE_OAUTH_TOKEN", envFile)
+		logMain.Info("created env file — edit it and set your CLAUDE_CODE_OAUTH_TOKEN", "path", envFile)
 	}
 }
 
@@ -341,14 +344,14 @@ func recoverOrphanedTasks(store *Store) {
 	ctx := context.Background()
 	tasks, err := store.ListTasks(ctx, true)
 	if err != nil {
-		log.Printf("recovery: list tasks: %v", err)
+		logRecovery.Error("list tasks", "error", err)
 		return
 	}
 	for _, t := range tasks {
 		if t.Status != "in_progress" {
 			continue
 		}
-		log.Printf("recovery: task %s was in_progress at startup, marking as failed", t.ID)
+		logRecovery.Warn("task was in_progress at startup, marking as failed", "task", t.ID)
 		store.UpdateTaskStatus(ctx, t.ID, "failed")
 		store.InsertEvent(ctx, t.ID, "error", map[string]string{
 			"error": "server restarted while task was in progress",

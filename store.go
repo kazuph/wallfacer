@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -95,12 +94,12 @@ func (s *Store) loadAll() error {
 		taskPath := filepath.Join(s.dir, entry.Name(), "task.json")
 		raw, err := os.ReadFile(taskPath)
 		if err != nil {
-			log.Printf("skipping %s: %v", entry.Name(), err)
+			logStore.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
 		var task Task
 		if err := json.Unmarshal(raw, &task); err != nil {
-			log.Printf("skipping %s: %v", entry.Name(), err)
+			logStore.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
 		s.tasks[id] = &task
@@ -122,12 +121,12 @@ func (s *Store) loadAll() error {
 			}
 			raw, err := os.ReadFile(filepath.Join(tracesDir, te.Name()))
 			if err != nil {
-				log.Printf("skipping trace %s/%s: %v", entry.Name(), te.Name(), err)
+				logStore.Warn("skipping trace", "task", entry.Name(), "trace", te.Name(), "error", err)
 				continue
 			}
 			var evt TaskEvent
 			if err := json.Unmarshal(raw, &evt); err != nil {
-				log.Printf("skipping trace %s/%s: %v", entry.Name(), te.Name(), err)
+				logStore.Warn("skipping trace", "task", entry.Name(), "trace", te.Name(), "error", err)
 				continue
 			}
 			s.events[id] = append(s.events[id], evt)
