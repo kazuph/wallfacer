@@ -287,3 +287,31 @@ Done. Here's what was changed:
 - **`ui/js/events.js`** — Escape key now closes the alert modal first (if open) before the detail modal; clicking the backdrop also closes it.
 
 ---
+
+## Task: d1482f72
+
+**Date**: 2026-02-21 00:15:24  
+**Branch**: task/d1482f72  
+**Commit**: `e2c7da306570b96f67b5c4b0da41644a20d30ecb`
+
+**Prompt**:
+> workspace level claude.md edit doesn't seem to work. I'd expect a modal shows up a text editor (with markdown support) to allow me update the CLAUDE.md
+> 
+> The re-init also doesn't seem to work. it poped up a alert then gone without any UI indication.
+
+**Result**:
+Both fixes are in place. Here's a summary of what was wrong and what changed:
+
+**Bug 1 — Edit modal closes instantly**
+
+Root cause: clicking "Edit" called `showInstructionsEditor()` which opened the modal, but the same click event then bubbled up to the `document` click listener. That listener saw the modal was open and the click target (the Edit button) wasn't inside `.modal-card`, so it immediately called `closeInstructionsEditor()`.
+
+Fix: `showInstructionsEditor` now accepts `event` and calls `event.stopPropagation()` at the start. The HTML `onclick` was updated to pass `event`.
+
+**Bug 2 — Re-init from settings panel has no visible result**
+
+Root cause: `reinitInstructions()` called `_doReinit()` without the `updateEditor` flag. The success branch for that case was empty — only errors produced feedback (`showAlert`). The user saw the `confirm()` dialog (the "alert"), clicked OK, the API call happened silently, and nothing changed visually.
+
+Fix: when `_doReinit` succeeds witho...
+
+---
