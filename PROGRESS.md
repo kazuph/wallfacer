@@ -244,3 +244,27 @@ The output will look like:
 (no result recorded)
 
 ---
+
+## Task: d33a8c2f
+
+**Date**: 2026-02-21 00:04:48  
+**Branch**: task/d33a8c2f  
+**Commit**: `80ea1c7b1252804a9ad34c63a45c605d7239e162`
+
+**Prompt**:
+> add project/workspace level CLAUDE.md that is initiated from the default CLAUDE.md defined in wallfacer. in the top right config center, allow manual editing to workspace level CLAUDE.md and allow re-init it by looking into individual repo folder's CLAUDE.md (if exists). The workspace level CLAUDE.md should be initialized in ~/.wallfacer/instructions folder. Allowing it to be used per unique combination of set of repo folders. E.g. Repo A and B is using wallfacer, then their workspace CLAUDE.md should be tight when both A and B are in the workspace. If not, e.g. only A, then it should be a different CLAUDE.md
+
+**Result**:
+All clean. Here's a summary of what was verified and updated in this pass:
+
+**Code verified still clean after upstream modifications:**
+- `runner.go` gained `KillContainer`, `SyncWorktrees`, `failSync`, and an enhanced `Run` with panic-recovery guard — the `instructionsPath` mount slot integrates cleanly alongside those additions.
+- `handler.go` gained `CancelTask` and `SyncTask` — the three new `GetInstructions`/`UpdateInstructions`/`ReinitInstructions` handlers were already placed after those.
+- `main.go` gained `/cancel` and `/sync` routes, plus a `Cancelled` column in the board — the three `/api/instructions` routes are correctly registered.
+- `styles.css` gained `badge-cancelled`, `col-header-cancelled`, terminal-style `.cc-*` classes, `diff-behind-warning`, and error-in-waiting card styles — no conflicts with the instructions modal.
+
+**`CLAUDE.md` updated to reflect current state:**
+- Added `instructions.go` to the key files list.
+- Updated the API routes table with the 8...
+
+---
