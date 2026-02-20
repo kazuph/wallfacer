@@ -760,6 +760,17 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 	logRunner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
 	runErr := cmd.Run()
 
+	// If the context was cancelled or timed out, exec.CommandContext killed
+	// the podman-run client process, but the container itself may still be
+	// running. Kill it explicitly and return the context error rather than
+	// parsing potentially incomplete NDJSON output (an intermediate stream
+	// event with no stop_reason would be misinterpreted as "waiting").
+	if ctx.Err() != nil {
+		exec.Command(r.command, "kill", containerName).Run()
+		exec.Command(r.command, "rm", "-f", containerName).Run()
+		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container terminated: %w", ctx.Err())
+	}
+
 	var output claudeOutput
 	raw := strings.TrimSpace(stdout.String())
 	if raw == "" {
