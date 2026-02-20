@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -431,20 +432,48 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	scanner := bufio.NewScanner(pr)
-	for scanner.Scan() {
-		line := scanner.Text()
-		_, werr := w.Write([]byte(line + "\n"))
-		if werr != nil {
-			break
+	// Feed scanner output through a channel so we can interleave keepalives.
+	lines := make(chan string)
+	go func() {
+		defer close(lines)
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			lines <- scanner.Text()
 		}
-		flusher.Flush()
+	}()
+
+	keepalive := time.NewTicker(15 * time.Second)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			pr.Close()
+			return
+		case line, ok := <-lines:
+			if !ok {
+				// Scanner finished (container exited).
+				return
+			}
+			if _, err := w.Write([]byte(line + "\n")); err != nil {
+				pr.Close()
+				return
+			}
+			flusher.Flush()
+		case <-keepalive.C:
+			// Send a blank line as keepalive to prevent proxy/browser timeouts.
+			if _, err := w.Write([]byte("\n")); err != nil {
+				pr.Close()
+				return
+			}
+			flusher.Flush()
+		}
 	}
-	pr.Close()
 }
 
 func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {

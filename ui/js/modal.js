@@ -559,28 +559,42 @@ function startLogStream(id) {
   _fetchLogs(id);
 }
 
-function _fetchLogs(id) {
+function _fetchLogs(id, retryDelay) {
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
-  rawLogBuffer = '';
-  const logsEl = document.getElementById('modal-logs');
-  logsEl.innerHTML = '';
+  if (!retryDelay) {
+    rawLogBuffer = '';
+    document.getElementById('modal-logs').innerHTML = '';
+  }
+  const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   const url = `/api/tasks/${id}/logs?raw=true`;
 
+  function reconnect() {
+    // Only reconnect if this task modal is still open and task is running.
+    if (currentTaskId !== id) return;
+    const task = tasks.find(t => t.id === id);
+    if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
+    const nextDelay = Math.min(delay * 2, 15000);
+    setTimeout(() => _fetchLogs(id, nextDelay), delay);
+  }
+
   fetch(url, { signal: logsAbort.signal })
     .then(res => {
-      if (!res.ok || !res.body) return;
+      if (!res.ok || !res.body) { reconnect(); return; }
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
-          if (done) return;
+          if (done) { reconnect(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
           renderLogs();
           read();
-        }).catch(() => {});
+        }).catch(() => reconnect());
       }
       read();
     })
-    .catch(() => {});
+    .catch(err => {
+      if (err.name === 'AbortError') return;
+      reconnect();
+    });
 }
