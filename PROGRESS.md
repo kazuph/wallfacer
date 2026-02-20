@@ -1003,3 +1003,32 @@ In `openModal`:
 - The old single-result block is replaced with `renderResultsFromEvents([task.resu...
 
 ---
+
+## Task: 4ac08a1c
+
+**Date**: 2026-02-21 02:10:09  
+**Branch**: task/4ac08a1c  
+**Commit**: `d740305907e82999be5b74af28cac2ba3a8e748e`
+
+**Prompt**:
+> this task 1f83e24d-1694-4058-a1fc-32c08f23ec76
+> 
+> add changes to the .github folder. but it seems not showing in git diff? when inspect the task card details.
+> 
+> investigate why and fix
+> 
+> I still cannot see the changes happened in this task ID: 1f83e24d-1694-4058-a1fc-32c08f23ec76. any ideas?
+
+**Result**:
+There were actually **two bugs** at play:
+
+**Bug 1 (fixed earlier):** `git diff <branch>` silently omits untracked files. New directories like `.github/` written by Claude but not yet staged are invisible to it. Fixed by enumerating untracked files with `git ls-files --others --exclude-standard` and generating individual diffs via `git diff --no-index /dev/null <file>`.
+
+**Bug 2 (just fixed):** For completed tasks, `cleanupWorktrees` deletes the worktree directories but never clears `WorktreePaths` from the store. So `TaskDiff` on a done task still tries to run `git diff` against directories that no longer exist — git errors silently, output is empty, and you see nothing.
+
+The fix:
+- `store.go`: Added `BaseCommitHashes` field to `Task` — stores the defBranch HEAD captured just before the ff-merge
+- `runner.go`: `rebaseAndMerge` now captures the base hash before each `ffMerge` and returns it; `commit()` saves it via `UpdateTaskBaseCommitHashes`
+- `handler.go`: `TaskDiff` checks `os....
+
+---
