@@ -785,3 +785,22 @@ Clean. Here's a summary of the changes:
 5. On error the spinner is cleaned up and the error is shown in red
 
 ---
+
+## Task: 290bde6a
+
+**Date**: 2026-02-21 01:28:51  
+**Branch**: task/290bde6a  
+**Commit**: `86798d393375bcb9d1b6ce9e9fa16a6b3a45ddf6`
+
+**Prompt**:
+> set default task duration from 5min to 15 min
+
+**Result**:
+Now the default is defined in exactly two places — one per language boundary:
+
+- **`runner.go`**: `defaultTaskTimeout = 15 * time.Minute` (used by all three timeout fallbacks)
+- **`tasks.js`**: `DEFAULT_TASK_TIMEOUT = 15` (used by both `|| fallback` expressions and to pre-select the dropdown on form open)
+
+To change the default in the future, update only those two constants.
+
+---
