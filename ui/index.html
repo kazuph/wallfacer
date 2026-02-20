@@ -239,13 +239,6 @@
             <button onclick="resumeTask()" class="btn btn-green">Resume</button>
           </div>
 
-          <!-- Cancel section (backlog / in_progress / waiting / failed) -->
-          <div id="modal-cancel-section" class="hidden mb-4">
-            <h3 class="section-title">Cancel Task</h3>
-            <p class="text-sm text-v-secondary mb-2">Discard all prepared changes and move this task to Cancelled. History and logs are preserved so the task can be retried later.</p>
-            <button onclick="cancelTask()" class="btn btn-ghost" style="border: 1px solid var(--border); color: #a02828;">Cancel task</button>
-          </div>
-
           <!-- Retry section for done/failed/cancelled tasks -->
           <div id="modal-retry-section" class="hidden mb-4">
             <h3 class="section-title">Retry</h3>
@@ -315,6 +308,13 @@
             <h3 class="section-title">Archived</h3>
             <p class="text-sm text-v-secondary mb-2">This task is archived and hidden from the Done column by default.</p>
             <button onclick="unarchiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Unarchive task</button>
+          </div>
+
+          <!-- Cancel section (backlog / in_progress / waiting / failed) -->
+          <div id="modal-cancel-section" class="hidden mb-4">
+            <h3 class="section-title">Cancel Task</h3>
+            <p class="text-sm text-v-secondary mb-2">Discard all prepared changes and move this task to Cancelled. History and logs are preserved so the task can be retried later.</p>
+            <button onclick="cancelTask()" class="btn btn-ghost" style="border: 1px solid var(--border); color: #a02828;">Cancel task</button>
           </div>
 
           <!-- Delete button -->
