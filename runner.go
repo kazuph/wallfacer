@@ -65,6 +65,13 @@ func (r *Runner) Command() string {
 	return r.command
 }
 
+// KillContainer sends a kill signal to the running container for a task.
+// Safe to call when no container is running — errors are silently ignored.
+func (r *Runner) KillContainer(taskID uuid.UUID) {
+	containerName := "wallfacer-" + taskID.String()
+	exec.Command(r.command, "kill", containerName).Run()
+}
+
 func (r *Runner) Workspaces() []string {
 	if r.workspaces == "" {
 		return nil
@@ -214,6 +221,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 		if err != nil {
 			logRunner.Error("container error", "task", taskID, "error", err)
+			// Don't overwrite a cancelled status — the cancel handler may have
+			// killed the container and already transitioned the task.
+			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == "cancelled" {
+				return
+			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{"error": err.Error()})

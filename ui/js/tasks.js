@@ -175,6 +175,20 @@ function scheduleBacklogSave() {
 document.getElementById('modal-edit-prompt').addEventListener('input', scheduleBacklogSave);
 document.getElementById('modal-edit-timeout').addEventListener('change', scheduleBacklogSave);
 
+// --- Cancel ---
+
+async function cancelTask() {
+  if (!currentTaskId) return;
+  if (!confirm('Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.')) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}/cancel`, { method: 'POST' });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    alert('Error cancelling task: ' + e.message);
+  }
+}
+
 // --- Archive / Unarchive ---
 
 async function archiveTask() {

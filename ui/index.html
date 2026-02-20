@@ -55,7 +55,7 @@
 </header>
 
 <!-- Board -->
-<main class="grid grid-cols-5 gap-4 p-6 flex-1 min-h-0" id="board">
+<main class="grid grid-cols-6 gap-4 p-6 flex-1 min-h-0" id="board">
   <div class="flex flex-col min-h-0">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-backlog">Backlog</h2>
@@ -111,6 +111,13 @@
       <span id="count-failed" class="text-xs text-v-muted">0</span>
     </div>
     <div id="col-failed" class="column col-bg space-y-2" data-status="failed"></div>
+  </div>
+  <div class="flex flex-col min-h-0">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-cancelled">Cancelled</h2>
+      <span id="count-cancelled" class="text-xs text-v-muted">0</span>
+    </div>
+    <div id="col-cancelled" class="column col-bg space-y-2" data-status="cancelled"></div>
   </div>
 </main>
 
@@ -182,7 +189,14 @@
             <button onclick="resumeTask()" class="btn btn-green">Resume</button>
           </div>
 
-          <!-- Retry section for done/failed tasks -->
+          <!-- Cancel section (backlog / in_progress / waiting / failed) -->
+          <div id="modal-cancel-section" class="hidden mb-4">
+            <h3 class="section-title">Cancel Task</h3>
+            <p class="text-sm text-v-secondary mb-2">Discard all prepared changes and move this task to Cancelled. History and logs are preserved so the task can be retried later.</p>
+            <button onclick="cancelTask()" class="btn btn-ghost" style="border: 1px solid var(--border); color: #a02828;">Cancel task</button>
+          </div>
+
+          <!-- Retry section for done/failed/cancelled tasks -->
           <div id="modal-retry-section" class="hidden mb-4">
             <h3 class="section-title">Retry</h3>
             <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>

@@ -43,7 +43,7 @@ async function fetchDiff(card, taskId, updatedAt) {
 }
 
 function render() {
-  const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [] };
+  const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [], cancelled: [] };
   for (const t of tasks) {
     const col = columns[t.status];
     if (col) col.push(t);

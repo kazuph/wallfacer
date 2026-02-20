@@ -198,6 +198,15 @@ func runServer(configDir string, args []string) {
 		handler.CompleteTask(w, r, id)
 	})
 
+	mux.HandleFunc("POST /api/tasks/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, "invalid task id", http.StatusBadRequest)
+			return
+		}
+		handler.CancelTask(w, r, id)
+	})
+
 	mux.HandleFunc("POST /api/tasks/{id}/resume", func(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))
 		if err != nil {

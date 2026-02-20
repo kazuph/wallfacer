@@ -6,14 +6,18 @@ Tasks progress through a well-defined set of states. Every transition is recorde
 
 ```
 BACKLOG ──drag──→ IN_PROGRESS ──end_turn──────────────────→ DONE
-                      │                                        │
-                      ├──max_tokens / pause_turn──→ (loop)     └──drag──→ ARCHIVED
-                      │
-                      ├──empty stop_reason──→ WAITING ──feedback──→ IN_PROGRESS
-                      │                              ──mark done──→ COMMITTING → DONE
-                      │
-                      └──is_error / timeout──→ FAILED ──resume──→ IN_PROGRESS (same session)
-                                                      ──retry───→ BACKLOG (fresh session)
+   │                  │                                        │
+   │                  ├──max_tokens / pause_turn──→ (loop)     └──drag──→ ARCHIVED
+   │                  │
+   │                  ├──empty stop_reason──→ WAITING ──feedback──→ IN_PROGRESS
+   │                  │                              ──mark done──→ COMMITTING → DONE
+   │                  │                              ──cancel────→ CANCELLED
+   │                  │
+   │                  └──is_error / timeout──→ FAILED ──resume──→ IN_PROGRESS (same session)
+   │                                                  ──retry───→ BACKLOG (fresh session)
+   │                                                  ──cancel──→ CANCELLED
+   │
+   └──cancel──→ CANCELLED ──retry──→ BACKLOG
 ```
 
 ## States
@@ -26,6 +30,7 @@ BACKLOG ──drag──→ IN_PROGRESS ──end_turn────────�
 | `committing` | Transient: commit pipeline running after mark-done |
 | `done` | Completed; changes committed and merged |
 | `failed` | Container error, Claude error, or timeout |
+| `cancelled` | Explicitly cancelled; sandbox cleaned up, history preserved |
 | `archived` | Done task moved off the active board |
 
 ## Turn Loop
@@ -63,6 +68,17 @@ When `stop_reason` is empty, Claude has asked a question or is blocked. The task
 - The task resumes from exactly where it paused, with the feedback message as the next prompt
 
 Alternatively, the user can mark the task done from `waiting`, which skips further Claude turns and jumps straight to the commit pipeline.
+
+## Cancellation
+
+Any task in `backlog`, `in_progress`, `waiting`, or `failed` can be cancelled via `POST /api/tasks/{id}/cancel`. The handler:
+
+1. **Kills the container** (if `in_progress`) — sends `podman kill wallfacer-<uuid>`. The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
+2. **Cleans up worktrees** — removes the git worktree and deletes the task branch, discarding all prepared changes.
+3. **Sets status to `cancelled`** and appends a `state_change` event.
+4. **Preserves history** — `data/<uuid>/traces/` and `data/<uuid>/outputs/` are left intact so execution logs, token usage, and the event timeline remain visible.
+
+From `cancelled`, the user can retry the task (moves it back to `backlog`) to restart from scratch.
 
 ## Data Models
 

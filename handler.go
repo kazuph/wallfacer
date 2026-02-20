@@ -267,6 +267,53 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+
+	cancellable := map[string]bool{
+		"backlog":     true,
+		"in_progress": true,
+		"waiting":     true,
+		"failed":      true,
+	}
+	if !cancellable[task.Status] {
+		http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)
+		return
+	}
+
+	oldStatus := task.Status
+
+	// For in_progress tasks: kill the running container first so the goroutine
+	// exits cleanly. The goroutine checks for cancelled status before setting
+	// failed, so it will not overwrite the transition we make below.
+	if oldStatus == "in_progress" {
+		h.runner.KillContainer(id)
+	}
+
+	// Clean up worktrees — discard all changes prepared so far.
+	// Traces, events, and turn outputs are intentionally left intact so the
+	// task history is preserved (useful if the task is later restored to backlog).
+	if len(task.WorktreePaths) > 0 {
+		h.runner.cleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+	}
+
+	if err := h.store.UpdateTaskStatus(r.Context(), id, "cancelled"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		"from": oldStatus,
+		"to":   "cancelled",
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
 func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {

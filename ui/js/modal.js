@@ -160,9 +160,14 @@ async function openModal(id) {
     resumeSection.classList.add('hidden');
   }
 
-  // Retry section (done/failed only)
+  // Cancel section (backlog / in_progress / waiting / failed)
+  const cancelSection = document.getElementById('modal-cancel-section');
+  const cancellable = ['backlog', 'in_progress', 'waiting', 'failed'];
+  cancelSection.classList.toggle('hidden', !cancellable.includes(task.status));
+
+  // Retry section (done / failed / cancelled)
   const retrySection = document.getElementById('modal-retry-section');
-  if (task.status === 'done' || task.status === 'failed') {
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
     retrySection.classList.remove('hidden');
     document.getElementById('modal-retry-prompt').value = task.prompt;
   } else {

@@ -15,6 +15,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `DELETE /api/tasks/{id}` | Delete task + cleanup worktrees |
 | `POST /api/tasks/{id}/feedback` | Write feedback event → launch `runner.Run` (resume) goroutine |
 | `POST /api/tasks/{id}/done` | Set `committing` → launch commit pipeline goroutine |
+| `POST /api/tasks/{id}/cancel` | Kill container (if running), clean up worktrees, set `cancelled`; traces/logs kept |
 | `POST /api/tasks/{id}/resume` | Resume failed task, same session → launch `runner.Run` goroutine |
 | `POST /api/tasks/{id}/archive` | Move done task to archived |
 | `POST /api/tasks/{id}/unarchive` | Restore archived task |
