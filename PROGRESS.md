@@ -120,3 +120,17 @@ repo's `.git/worktrees/` by absolute host path. Containers cannot resolve
 these paths. All git operations on worktree data must happen on the **host**.
 
 ---
+
+## Task: 08bfbaaa
+
+**Date**: 2026-02-20 22:17:58  
+**Branch**: task/08bfbaaa  
+**Commit**: `618f260c8999baf059ebd6fa03b2446879667177`
+
+**Prompt**:
+> The "Wallfacer" logo text on top left is black. change this to bold blue rgb(0, 85, 170)
+
+**Result**:
+Done. The "Wallfacer" logo text is now styled with `color: rgb(0, 85, 170)` and `font-weight: 700` (bold) at `index.html:29`.
+
+---
