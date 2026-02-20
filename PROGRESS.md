@@ -1032,3 +1032,24 @@ The fix:
 - `handler.go`: `TaskDiff` checks `os....
 
 ---
+
+## Task: 1f83e24d
+
+**Date**: 2026-02-21 02:11:10  
+**Branch**: task/1f83e24d  
+**Commit**: `c4a4899a6e232d2664a78574d7f1de24be78b343`
+
+**Prompt**:
+> setup github workflow to run tests in github action
+
+**Result**:
+The workflow is at `/workspace/wallfacer/.github/workflows/test.yml`. It:
+
+- Triggers on pushes and PRs to `main`
+- Uses `go-version-file: go.mod` to pick up the Go version automatically
+- Runs `go vet ./...` for static analysis
+- Runs `go test -v -race ./...` with the race detector enabled
+
+The tests configure their own git identity (`test@test.com` / `Test`) so no extra git setup step is needed in the workflow.
+
+---
