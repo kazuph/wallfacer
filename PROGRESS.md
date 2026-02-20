@@ -376,3 +376,27 @@ The changes are in `main.go:285-307`. Here's what was done:
 - Default remains `:8080`; `-addr` flag and `ADDR` env var still work as before
 
 ---
+
+## Task: 26c14307
+
+**Date**: 2026-02-21 00:40:20  
+**Branch**: task/26c14307  
+**Commit**: `e0b6c60d08c06810db845f87f52d963c630c12e4`
+
+**Prompt**:
+> modal-card is too narrow when viewing waiting card, it shows both task exec details and code diff. make it wider and optimzie for reading/inspection
+
+**Result**:
+The changes look correct. Here's a summary of what was changed:
+
+**`ui/css/styles.css`:**
+- Base `.modal-card`: widened from `672px` → `760px` (benefits all modals)
+- `.modal-card.modal-wide`: expanded from `min(90vw, 1280px)` → `min(96vw, 1600px)` — roughly 25% more width on a typical monitor
+- Panel split: left (task details/logs) is `flex: 2`, right (diff) is `flex: 3` — diff gets 60% of the space since code needs horizontal room
+- Replaced `gap: 24px` with a `border-right` + `padding-right: 28px` + `margin-right: 28px` on the left panel for a proper visual divider
+- `.modal-wide .logs-block`: logs expand to `560px` tall (was `384px`) so you can see more execution context without scrolling
+
+**`ui/js/modal.js`:**
+- Set inline `gap` to `'0'` to defer to the CSS-driven padding/border approach
+
+---
