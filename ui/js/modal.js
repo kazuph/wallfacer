@@ -132,7 +132,7 @@ async function openModal(id) {
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
 
   // Diff section (waiting/failed tasks with worktrees) — shown in right panel
-  const modalCard = document.querySelector('.modal-card');
+  const modalCard = document.querySelector('#modal .modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
   const modalBody = document.getElementById('modal-body');
@@ -269,7 +269,7 @@ function closeModal() {
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   currentTaskId = null;
-  document.querySelector('.modal-card').classList.remove('modal-wide');
+  document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';
   modalBody.style.gap = '';
