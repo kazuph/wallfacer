@@ -1077,3 +1077,29 @@ Builds clean, all tests pass. Here's a summary of what changed and why:
 2. **`setupNonGitSnapshot`** (new) �...
 
 ---
+
+## Task: 38e607c3
+
+**Date**: 2026-02-21 02:57:16  
+**Branch**: task/38e607c3  
+**Commit**: `1dbde930d0bd6da29f49763f5f3f593fd07a4aa0`
+
+**Prompt**:
+> Add a test to check if workspace CLAUDE.md is correctly loaded in the sandbox claude code execution
+
+**Result**:
+All done. Here's a summary of the two files changed:
+
+**`runner.go`** — extracted `buildContainerArgs` method  
+The arg-building block inside `runContainer` was pulled into a new `buildContainerArgs(containerName, prompt, sessionID string, worktreeOverrides map[string]string) []string` method. `runContainer` now calls it. Because this method is a pure function of runner config + parameters, it can be tested without launching a container.
+
+**`instructions_test.go`** (new, 18 tests)
+
+| Group | Tests |
+|---|---|
+| `instructionsKey` | stable, order-independent, different inputs → different keys, 16-char output |
+| `buildInstructionsContent` | default-only when no CLAUDE.md, workspace CLAUDE.md appended with header, missing file silently skipped, multiple workspaces in order, trailing-newline padding |
+| `ensureWorkspaceInstructions` | creates file, idempotent (user edits preserved), workspace CLAUDE.md included on first creation |
+| `reinitWorkspaceInstructions` | overwrites stale/cust...
+
+---
