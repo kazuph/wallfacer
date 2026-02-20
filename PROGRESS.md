@@ -195,3 +195,35 @@ If you paste the diff here I can pinpoint exactly why `commit_test.go` appears i
 (no result recorded)
 
 ---
+
+## Task: 881e4374
+
+**Date**: 2026-02-20 23:35:50  
+**Branch**: task/881e4374  
+**Commit**: `b703c97ffb732eb166ad073b22ad2e7a8565c6eb`
+
+**Prompt**:
+> the live log pretty rendering seems odd. Example:
+> 
+> ⏺ Read(/workspace/wallfacer/runner.go)
+> ⎿
+>    380→
+>    381→	// Phase 3: persist commit hashes and write PROGRESS.md.
+>    382→	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+> 
+> why the code there has this strange "→" symbol? this make the reading a little harder. consider to fix this
+
+**Result**:
+This regex `^(\s*\d+)→\t?` matches the line-number prefix (optional spaces + digits + arrow + optional tab) and replaces it with the number followed by two spaces. So:
+
+- `   380→\t// comment` becomes `   380  // comment`
+- `   381→` (empty line) becomes `   381  `
+
+The output will look like:
+```
+   380  
+   381  // Phase 3: persist commit hashes and write PROGRESS.md.
+   382  r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+```
+
+---
