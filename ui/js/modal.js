@@ -1,3 +1,58 @@
+// --- Diff helpers ---
+
+function parseDiffByFile(diff) {
+  const files = [];
+  const blocks = diff.split(/(?=^diff --git )/m);
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    const lines = block.split('\n');
+    const match = lines[0].match(/^diff --git a\/.+ b\/(.+)$/);
+    const filename = match ? match[1] : lines[0];
+    let adds = 0, dels = 0;
+    for (const line of lines.slice(1)) {
+      if (line.startsWith('+') && !line.startsWith('+++')) adds++;
+      if (line.startsWith('-') && !line.startsWith('---')) dels++;
+    }
+    files.push({ filename, content: block, adds, dels });
+  }
+  return files;
+}
+
+function renderDiffLine(line) {
+  const escaped = escapeHtml(line);
+  if (line.startsWith('+') && !line.startsWith('+++')) return `<span class="diff-line diff-add">${escaped}</span>`;
+  if (line.startsWith('-') && !line.startsWith('---')) return `<span class="diff-line diff-del">${escaped}</span>`;
+  if (line.startsWith('@@')) return `<span class="diff-line diff-hunk">${escaped}</span>`;
+  if (/^(diff |--- |\+{3} |index |Binary )/.test(line)) return `<span class="diff-line diff-header">${escaped}</span>`;
+  return `<span class="diff-line">${escaped}</span>`;
+}
+
+function renderDiffFiles(container, diff) {
+  if (!diff) {
+    container.innerHTML = '<span class="text-xs text-v-muted">No changes</span>';
+    return;
+  }
+  const files = parseDiffByFile(diff);
+  if (files.length === 0) {
+    container.innerHTML = '<span class="text-xs text-v-muted">No changes</span>';
+    return;
+  }
+  container.innerHTML = files.map(f => {
+    const statsHtml = [
+      f.adds > 0 ? `<span class="diff-add">+${f.adds}</span>` : '',
+      f.dels > 0 ? `<span class="diff-del">&minus;${f.dels}</span>` : '',
+    ].filter(Boolean).join(' ');
+    const diffHtml = f.content.split('\n').map(renderDiffLine).join('\n');
+    return `<details class="diff-file">
+      <summary class="diff-file-summary">
+        <span class="diff-filename">${escapeHtml(f.filename)}</span>
+        <span class="diff-stats">${statsHtml}</span>
+      </summary>
+      <pre class="diff-block diff-block-modal">${diffHtml}</pre>
+    </details>`;
+  }).join('');
+}
+
 // --- Modal ---
 
 async function openModal(id) {
@@ -75,6 +130,27 @@ async function openModal(id) {
 
   const feedbackSection = document.getElementById('modal-feedback-section');
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
+
+  // Diff section (waiting tasks with worktrees) — shown in right panel
+  const modalCard = document.querySelector('.modal-card');
+  const modalRight = document.getElementById('modal-right');
+  const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
+  if (task.status === 'waiting' && hasWorktrees) {
+    modalCard.classList.add('modal-wide');
+    modalRight.classList.remove('hidden');
+    const filesEl = document.getElementById('modal-diff-files');
+    filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
+    api(`/api/tasks/${task.id}/diff`).then(data => {
+      const el = document.getElementById('modal-diff-files');
+      if (el) renderDiffFiles(el, data.diff);
+    }).catch(() => {
+      const el = document.getElementById('modal-diff-files');
+      if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';
+    });
+  } else {
+    modalCard.classList.remove('modal-wide');
+    modalRight.classList.add('hidden');
+  }
 
   // Resume section (failed with session_id only)
   const resumeSection = document.getElementById('modal-resume-section');
@@ -164,6 +240,7 @@ function closeModal() {
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   currentTaskId = null;
+  document.querySelector('.modal-card').classList.remove('modal-wide');
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal').classList.remove('flex');
 }

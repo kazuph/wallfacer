@@ -127,133 +127,143 @@
         <button onclick="closeModal()" class="text-v-muted text-xl leading-none" style="background:none;border:none;cursor:pointer;font-size:20px;">&times;</button>
       </div>
 
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="section-title" style="margin-bottom:0;">Prompt</h3>
-        <div id="modal-prompt-actions" class="flex items-center gap-1.5 hidden">
-          <button id="copy-prompt-btn" onclick="copyModalText('prompt')" class="btn-icon" title="Copy to clipboard">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            Copy
-          </button>
-          <button id="toggle-prompt-btn" onclick="toggleModalSection('prompt')" class="btn-icon">Raw</button>
-        </div>
-      </div>
-      <div id="modal-prompt-rendered" class="code-block mb-4 prose-content hidden"></div>
-      <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
+      <div id="modal-body">
+        <div id="modal-left">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="section-title" style="margin-bottom:0;">Prompt</h3>
+            <div id="modal-prompt-actions" class="flex items-center gap-1.5 hidden">
+              <button id="copy-prompt-btn" onclick="copyModalText('prompt')" class="btn-icon" title="Copy to clipboard">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+              </button>
+              <button id="toggle-prompt-btn" onclick="toggleModalSection('prompt')" class="btn-icon">Raw</button>
+            </div>
+          </div>
+          <div id="modal-prompt-rendered" class="code-block mb-4 prose-content hidden"></div>
+          <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
 
-      <!-- Editable prompt/timeout for backlog tasks -->
-      <div id="modal-edit-section" class="hidden mb-4">
-        <textarea id="modal-edit-prompt" rows="4" class="field"></textarea>
-        <div class="flex items-center gap-2 mt-2">
-          <span id="modal-edit-status" class="text-xs text-v-muted"></span>
-          <div class="ml-auto flex items-center gap-1.5">
-            <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
-            <select id="modal-edit-timeout" class="select">
-              <option value="5">5 min</option>
-              <option value="15">15 min</option>
-              <option value="30">30 min</option>
-              <option value="60">1 hour</option>
-              <option value="120">2 hours</option>
-              <option value="360">6 hours</option>
-              <option value="720">12 hours</option>
-              <option value="1440">24 hours</option>
-            </select>
+          <!-- Editable prompt/timeout for backlog tasks -->
+          <div id="modal-edit-section" class="hidden mb-4">
+            <textarea id="modal-edit-prompt" rows="4" class="field"></textarea>
+            <div class="flex items-center gap-2 mt-2">
+              <span id="modal-edit-status" class="text-xs text-v-muted"></span>
+              <div class="ml-auto flex items-center gap-1.5">
+                <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
+                <select id="modal-edit-timeout" class="select">
+                  <option value="5">5 min</option>
+                  <option value="15">15 min</option>
+                  <option value="30">30 min</option>
+                  <option value="60">1 hour</option>
+                  <option value="120">2 hours</option>
+                  <option value="360">6 hours</option>
+                  <option value="720">12 hours</option>
+                  <option value="1440">24 hours</option>
+                </select>
+              </div>
+            </div>
+            <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
+              <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
+              <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
+            </div>
+          </div>
+
+          <!-- Prompt history (collapsible) -->
+          <div id="modal-history-section" class="hidden mb-4">
+            <details>
+              <summary class="text-sm font-medium text-v-muted" style="cursor:pointer;">Prompt History</summary>
+              <div id="modal-history-list" class="mt-2 space-y-2"></div>
+            </details>
+          </div>
+
+          <!-- Resume section for failed tasks with session_id -->
+          <div id="modal-resume-section" class="hidden mb-4">
+            <h3 class="section-title">Resume Session</h3>
+            <p class="text-sm text-v-secondary mb-2">This task has an active session. Resume to continue from where it left off.</p>
+            <button onclick="resumeTask()" class="btn btn-green">Resume</button>
+          </div>
+
+          <!-- Retry section for done/failed tasks -->
+          <div id="modal-retry-section" class="hidden mb-4">
+            <h3 class="section-title">Retry</h3>
+            <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
+            <button onclick="retryTask()" class="btn btn-accent mt-2">Move to Backlog</button>
+          </div>
+
+          <div id="modal-result-section" class="hidden">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="section-title" style="margin-bottom:0;">Result</h3>
+              <div class="flex items-center gap-1.5">
+                <button id="copy-result-btn" onclick="copyModalText('result')" class="btn-icon" title="Copy to clipboard">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  Copy
+                </button>
+                <button id="toggle-result-btn" onclick="toggleModalSection('result')" class="btn-icon">Raw</button>
+              </div>
+            </div>
+            <div id="modal-result-rendered" class="code-block mb-4 prose-content"></div>
+            <pre id="modal-result" class="code-block mb-4 hidden"></pre>
+          </div>
+
+          <!-- Usage stats -->
+          <div id="modal-usage-section" class="hidden mb-4">
+            <h3 class="section-title">Usage</h3>
+            <div class="usage-grid">
+              <div class="flex justify-between"><span class="usage-label">Input tokens</span><span id="modal-usage-input" class="usage-value"></span></div>
+              <div class="flex justify-between"><span class="usage-label">Output tokens</span><span id="modal-usage-output" class="usage-value"></span></div>
+              <div class="flex justify-between"><span class="usage-label">Cache read</span><span id="modal-usage-cache-read" class="usage-value"></span></div>
+              <div class="flex justify-between"><span class="usage-label">Cache creation</span><span id="modal-usage-cache-creation" class="usage-value"></span></div>
+              <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
+            </div>
+          </div>
+
+          <!-- Live logs for in-progress tasks -->
+          <div id="modal-logs-section" class="hidden mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="section-title" style="margin-bottom:0;">Live Output</h3>
+              <button id="toggle-logs-btn" onclick="toggleLogsMode()" class="btn-icon">Raw</button>
+            </div>
+            <pre id="modal-logs" class="logs-block"></pre>
+          </div>
+
+          <!-- Feedback form for waiting tasks -->
+          <div id="modal-feedback-section" class="hidden mb-4">
+            <h3 class="section-title">Provide Feedback</h3>
+            <textarea id="modal-feedback" rows="3" placeholder="Type your response..." class="field"></textarea>
+            <div class="flex items-center gap-2 mt-2">
+              <button onclick="submitFeedback()" class="btn btn-yellow">Submit Feedback</button>
+              <button onclick="completeTask()" class="btn btn-green">Mark as Done</button>
+            </div>
+          </div>
+
+          <!-- Events timeline -->
+          <h3 class="section-title">Events</h3>
+          <div id="modal-events" class="space-y-2"></div>
+
+          <!-- Archive section (done tasks only, not yet archived) -->
+          <div id="modal-archive-section" class="hidden mb-4">
+            <h3 class="section-title">Archive</h3>
+            <p class="text-sm text-v-secondary mb-2">Hide this task from the Done column. It can be restored from Settings &rarr; Show archived tasks.</p>
+            <button onclick="archiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Archive task</button>
+          </div>
+
+          <!-- Unarchive section (archived done tasks) -->
+          <div id="modal-unarchive-section" class="hidden mb-4">
+            <h3 class="section-title">Archived</h3>
+            <p class="text-sm text-v-secondary mb-2">This task is archived and hidden from the Done column by default.</p>
+            <button onclick="unarchiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Unarchive task</button>
+          </div>
+
+          <!-- Delete button -->
+          <div class="mt-6 pt-4" style="border-top: 1px solid var(--border);">
+            <button onclick="deleteCurrentTask()" class="btn-danger">Delete task</button>
           </div>
         </div>
-        <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
-          <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
-          <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
+
+        <!-- Right panel: diff for waiting tasks with worktrees -->
+        <div id="modal-right" class="hidden">
+          <h3 class="section-title">Changes</h3>
+          <div id="modal-diff-files"></div>
         </div>
-      </div>
-
-      <!-- Prompt history (collapsible) -->
-      <div id="modal-history-section" class="hidden mb-4">
-        <details>
-          <summary class="text-sm font-medium text-v-muted" style="cursor:pointer;">Prompt History</summary>
-          <div id="modal-history-list" class="mt-2 space-y-2"></div>
-        </details>
-      </div>
-
-      <!-- Resume section for failed tasks with session_id -->
-      <div id="modal-resume-section" class="hidden mb-4">
-        <h3 class="section-title">Resume Session</h3>
-        <p class="text-sm text-v-secondary mb-2">This task has an active session. Resume to continue from where it left off.</p>
-        <button onclick="resumeTask()" class="btn btn-green">Resume</button>
-      </div>
-
-      <!-- Retry section for done/failed tasks -->
-      <div id="modal-retry-section" class="hidden mb-4">
-        <h3 class="section-title">Retry</h3>
-        <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
-        <button onclick="retryTask()" class="btn btn-accent mt-2">Move to Backlog</button>
-      </div>
-
-      <div id="modal-result-section" class="hidden">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="section-title" style="margin-bottom:0;">Result</h3>
-          <div class="flex items-center gap-1.5">
-            <button id="copy-result-btn" onclick="copyModalText('result')" class="btn-icon" title="Copy to clipboard">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              Copy
-            </button>
-            <button id="toggle-result-btn" onclick="toggleModalSection('result')" class="btn-icon">Raw</button>
-          </div>
-        </div>
-        <div id="modal-result-rendered" class="code-block mb-4 prose-content"></div>
-        <pre id="modal-result" class="code-block mb-4 hidden"></pre>
-      </div>
-
-      <!-- Usage stats -->
-      <div id="modal-usage-section" class="hidden mb-4">
-        <h3 class="section-title">Usage</h3>
-        <div class="usage-grid">
-          <div class="flex justify-between"><span class="usage-label">Input tokens</span><span id="modal-usage-input" class="usage-value"></span></div>
-          <div class="flex justify-between"><span class="usage-label">Output tokens</span><span id="modal-usage-output" class="usage-value"></span></div>
-          <div class="flex justify-between"><span class="usage-label">Cache read</span><span id="modal-usage-cache-read" class="usage-value"></span></div>
-          <div class="flex justify-between"><span class="usage-label">Cache creation</span><span id="modal-usage-cache-creation" class="usage-value"></span></div>
-          <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
-        </div>
-      </div>
-
-      <!-- Live logs for in-progress tasks -->
-      <div id="modal-logs-section" class="hidden mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="section-title" style="margin-bottom:0;">Live Output</h3>
-          <button id="toggle-logs-btn" onclick="toggleLogsMode()" class="btn-icon">Raw</button>
-        </div>
-        <pre id="modal-logs" class="logs-block"></pre>
-      </div>
-
-      <!-- Feedback form for waiting tasks -->
-      <div id="modal-feedback-section" class="hidden mb-4">
-        <h3 class="section-title">Provide Feedback</h3>
-        <textarea id="modal-feedback" rows="3" placeholder="Type your response..." class="field"></textarea>
-        <div class="flex items-center gap-2 mt-2">
-          <button onclick="submitFeedback()" class="btn btn-yellow">Submit Feedback</button>
-          <button onclick="completeTask()" class="btn btn-green">Mark as Done</button>
-        </div>
-      </div>
-
-      <!-- Events timeline -->
-      <h3 class="section-title">Events</h3>
-      <div id="modal-events" class="space-y-2"></div>
-
-      <!-- Archive section (done tasks only, not yet archived) -->
-      <div id="modal-archive-section" class="hidden mb-4">
-        <h3 class="section-title">Archive</h3>
-        <p class="text-sm text-v-secondary mb-2">Hide this task from the Done column. It can be restored from Settings &rarr; Show archived tasks.</p>
-        <button onclick="archiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Archive task</button>
-      </div>
-
-      <!-- Unarchive section (archived done tasks) -->
-      <div id="modal-unarchive-section" class="hidden mb-4">
-        <h3 class="section-title">Archived</h3>
-        <p class="text-sm text-v-secondary mb-2">This task is archived and hidden from the Done column by default.</p>
-        <button onclick="unarchiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Unarchive task</button>
-      </div>
-
-      <!-- Delete button -->
-      <div class="mt-6 pt-4" style="border-top: 1px solid var(--border);">
-        <button onclick="deleteCurrentTask()" class="btn-danger">Delete task</button>
       </div>
     </div>
   </div>
