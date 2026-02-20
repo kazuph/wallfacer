@@ -52,6 +52,16 @@ func createWorktree(repoPath, worktreePath, branchName string) error {
 		"git", "-C", repoPath,
 		"worktree", "add", "-b", branchName, worktreePath, "HEAD",
 	).CombinedOutput()
+	if err != nil && strings.Contains(string(out), "already exists") {
+		// A stale branch was left behind by a previous failed cleanup (e.g. the
+		// worktree directory was removed but the branch was not). Force-delete the
+		// orphaned branch and retry so the task can start fresh from HEAD.
+		exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run()
+		out, err = exec.Command(
+			"git", "-C", repoPath,
+			"worktree", "add", "-b", branchName, worktreePath, "HEAD",
+		).CombinedOutput()
+	}
 	if err != nil {
 		// Branch may already exist when the worktree directory was deleted but the
 		// git branch survived (e.g. server restart). The stale worktree entry in
@@ -80,9 +90,16 @@ func removeWorktree(repoPath, worktreePath, branchName string) error {
 		"worktree", "remove", "--force", worktreePath,
 	).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git worktree remove %s: %w\n%s", worktreePath, err, out)
+		// If the directory is already gone, prune stale refs and carry on so
+		// that the branch deletion below still runs. Otherwise surface the error.
+		if strings.Contains(string(out), "not a worktree") || strings.Contains(string(out), "not found") {
+			exec.Command("git", "-C", repoPath, "worktree", "prune").Run()
+		} else {
+			return fmt.Errorf("git worktree remove %s: %w\n%s", worktreePath, err, out)
+		}
 	}
-	// Delete the branch (best-effort).
+	// Delete the branch (best-effort) — always attempted so stale branches
+	// are cleaned up even when the worktree directory was already missing.
 	exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run()
 	return nil
 }

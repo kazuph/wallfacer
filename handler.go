@@ -116,6 +116,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 		// Handle retry: done/failed → backlog
 		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed") {
+			// Clean up any existing worktrees before resetting. If the task
+			// failed mid-execution its worktrees (and git branch) were preserved
+			// for potential resume; resetting clears WorktreePaths from the
+			// store but without a physical cleanup the branch would linger and
+			// cause "branch already exists" on the next run.
+			if len(task.WorktreePaths) > 0 {
+				h.runner.cleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+			}
 			newPrompt := task.Prompt
 			if req.Prompt != nil {
 				newPrompt = *req.Prompt
