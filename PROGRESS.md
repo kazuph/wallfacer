@@ -438,3 +438,21 @@ All done. Here's a summary of what was changed:
 - `updateCard` now renders `<div class="card-title">...</div>` above the prompt text, but only when `t.title` is pre...
 
 ---
+
+## Task: 26c14307
+
+**Date**: 2026-02-21 00:54:02  
+**Branch**: task/26c14307  
+**Commit**: `6f5c7c78fd95ff0325536c9ad57c93a8b64aeb7d`
+
+**Prompt**:
+> modal-card is too narrow when viewing waiting card, it shows both task exec details and code diff. make it wider and optimzie for reading/inspection
+> 
+> the previous implementation doesn't seem to work and still have narrow view.
+
+**Result**:
+The root cause: `document.querySelector('.modal-card')` was matching the **instructions editor modal** (first in DOM order, line 67) instead of the task detail modal (line 162). So `modal-wide` was being added to the hidden instructions modal card — the CSS width expansion and panel layout rules never fired on the actual modal you were looking at.
+
+The fix scopes both selectors to `#modal .modal-card`, which unambiguously targets the task detail modal card. Now when you open a waiting/failed task with worktrees, the card will expand to `min(96vw, 1600px)` with the 40/60 left/right panel split and the divider between them.
+
+---
