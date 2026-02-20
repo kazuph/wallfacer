@@ -21,9 +21,11 @@ make run PROMPT="…" # Headless one-shot Claude execution with a prompt
 CLI usage (after `go build -o wallfacer .`):
 
 ```bash
-wallfacer ~/project1 ~/project2   # Mount workspaces, open browser
-wallfacer                          # Defaults to current directory
-wallfacer -addr :9090 -no-browser  # Custom port, no browser
+wallfacer                                    # Print help
+wallfacer run ~/project1 ~/project2          # Mount workspaces, open browser
+wallfacer run                                # Defaults to current directory
+wallfacer run -addr :9090 -no-browser        # Custom port, no browser
+wallfacer env                                # Show config and env status
 ```
 
 The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.
@@ -40,7 +42,7 @@ go vet ./...              # Lint
 There are no tests currently. The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
 
 Key server files:
-- `main.go` — CLI flags, workspace resolution, store init, HTTP routing, browser launch, server startup
+- `main.go` — Subcommand dispatch (`run`, `env`), CLI flags, workspace resolution, store init, HTTP routing, browser launch, server startup
 - `handler.go` — API handlers: tasks CRUD, feedback, resume, complete, event retrieval, output serving
 - `runner.go` — Container orchestration via `os/exec`; creates/runs/parses sandbox output; persists raw output per turn; usage tracking
 - `store.go` — Per-task directory persistence (`data/<uuid>/task.json` + `traces/` + `outputs/`), data models (Task, TaskUsage, TaskEvent)
@@ -97,9 +99,14 @@ data/<uuid>/
 - **Frontend** polls every 2 seconds; uses optimistic UI updates; escapes HTML to prevent XSS
 - **No framework** on backend (stdlib `net/http`) or frontend (vanilla JS)
 
-## CLI Flags & Environment
+## CLI Subcommands & Flags
 
-CLI flags (with env var fallbacks):
+Running `wallfacer` with no arguments prints help. Subcommands:
+
+- `wallfacer run [flags] [workspace ...]` — Start the Kanban server
+- `wallfacer env` — Show configuration and env file status
+
+Flags for `wallfacer run` (with env var fallbacks):
 
 | Flag | Env Var | Default | Description |
 |------|---------|---------|-------------|
@@ -107,9 +114,9 @@ CLI flags (with env var fallbacks):
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Data directory |
 | `-container` | `CONTAINER_CMD` | `/opt/podman/bin/podman` | Container runtime command |
 | `-image` | `SANDBOX_IMAGE` | `wallfacer:latest` | Sandbox container image |
-| `-env` | `ENV_FILE` | `~/.wallfacer/.env` | Env file for container (Claude token) |
+| `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file for container (Claude token) |
 | `-no-browser` | — | `false` | Do not open browser on start |
 
-Positional arguments are workspace directories to mount (defaults to cwd).
+Positional arguments after flags are workspace directories to mount (defaults to cwd).
 
 Sandbox env (in `~/.wallfacer/.env`): `CLAUDE_CODE_OAUTH_TOKEN` (required)
