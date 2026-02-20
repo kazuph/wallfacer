@@ -10,6 +10,20 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
   </tr>
 </table>
 
+## Features
+
+- **Kanban board** — visual task management with Backlog, In Progress, Waiting, Done, and Cancelled columns
+- **Isolated sandbox execution** — each task runs in an ephemeral Podman/Docker container; tasks can run in parallel without interfering
+- **Git worktree isolation** — every task gets its own git branch and worktree so concurrent changes never conflict
+- **Human-in-the-loop feedback** — when Claude needs clarification, the card moves to Waiting; submit feedback to resume execution
+- **Auto commit and push** — completed task changes are automatically committed and pushed to the remote
+- **Live log streaming** — real-time container output via Server-Sent Events
+- **Task event timeline** — full audit trail of state changes, outputs, and feedback per task
+- **Usage tracking** — input/output tokens, cache hits, and cost accumulated across all turns per task
+- **Workspace instructions** — per-workspace `CLAUDE.md` managed from the UI; shared across all tasks for that workspace
+- **Multiple workspaces** — mount several project directories at once; Claude can read and write across all of them
+- **Diff viewer** — inspect exactly what changed in each task before accepting it
+
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+
