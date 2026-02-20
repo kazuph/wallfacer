@@ -926,3 +926,23 @@ All done. Here's a summary of the changes made:
 **`ui/js/modal.js`** — `openModal()` pre-populates `modal-resume-timeout` with the task's current `timeout` value when the resume section is shown, so the user sees the existing deadline as a sensible default to ...
 
 ---
+
+## Task: c348eac5
+
+**Date**: 2026-02-21 01:48:23  
+**Branch**: task/c348eac5  
+**Commit**: `e47f369bd2a4f2352774e380e283076f4cc5f194`
+
+**Prompt**:
+> generate missing title should only look for those that do not have a title
+
+**Result**:
+Good. The fix adds an early-return guard at the top of `GenerateTitle` (`runner.go:931-935`): if the task already has a title when the goroutine actually executes, it skips container creation entirely. This closes the race window where:
+
+1. A task is created → `GenerateTitle` goroutine queued (title still empty)
+2. User clicks "Generate Missing" before goroutine finishes → backend sees empty title, queues a second `GenerateTitle` goroutine
+3. Both goroutines would previously race to write a title
+
+With the guard, whichever goroutine runs second sees `t.Title != ""` and returns immediately without launching a container.
+
+---
