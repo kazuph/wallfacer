@@ -921,7 +921,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	args = append(args, r.sandboxImage)
 
 	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. No punctuation, no quotes, no explanation — just the title.\n\nTask:\n" + prompt
-	args = append(args, "-p", titlePrompt, "--output-format", "stream-json")
+	args = append(args, "-p", titlePrompt, "--output-format", "stream-json", "--verbose")
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
