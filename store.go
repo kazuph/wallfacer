@@ -477,7 +477,7 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 	return s.saveTask(id, t)
 }
 
-func (s *Store) ResumeTask(_ context.Context, id uuid.UUID) error {
+func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -487,6 +487,16 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID) error {
 	}
 
 	t.Status = "in_progress"
+	if timeout != nil {
+		v := *timeout
+		if v <= 0 {
+			v = 5
+		}
+		if v > 1440 {
+			v = 1440
+		}
+		t.Timeout = v
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

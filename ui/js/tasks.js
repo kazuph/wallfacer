@@ -127,7 +127,12 @@ async function retryTask() {
 async function resumeTask() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/resume`, { method: 'POST' });
+    const timeoutEl = document.getElementById('modal-resume-timeout');
+    const timeout = timeoutEl ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT : DEFAULT_TASK_TIMEOUT;
+    await api(`/api/tasks/${currentTaskId}/resume`, {
+      method: 'POST',
+      body: JSON.stringify({ timeout }),
+    });
     closeModal();
     fetchTasks();
   } catch (e) {

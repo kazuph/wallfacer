@@ -235,8 +235,21 @@
           <!-- Resume section for failed tasks with session_id -->
           <div id="modal-resume-section" class="hidden mb-4">
             <h3 class="section-title">Resume Session</h3>
-            <p class="text-sm text-v-secondary mb-2">This task has an active session. Resume to continue from where it left off.</p>
-            <button onclick="resumeTask()" class="btn btn-green">Resume</button>
+            <p class="text-sm text-v-secondary mb-2">This task has an active session. Resume to continue from where it left off with an extended timeout.</p>
+            <div class="flex items-center gap-2">
+              <button onclick="resumeTask()" class="btn btn-green">Resume</button>
+              <label for="modal-resume-timeout" class="text-xs text-v-muted">Timeout</label>
+              <select id="modal-resume-timeout" class="select">
+                <option value="5">5 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60">1 hour</option>
+                <option value="120">2 hours</option>
+                <option value="360">6 hours</option>
+                <option value="720">12 hours</option>
+                <option value="1440">24 hours</option>
+              </select>
+            </div>
           </div>
 
           <!-- Retry section for done/failed/cancelled tasks -->

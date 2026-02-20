@@ -180,6 +180,10 @@ async function openModal(id) {
   const resumeSection = document.getElementById('modal-resume-section');
   if (task.status === 'failed' && task.session_id) {
     resumeSection.classList.remove('hidden');
+    const resumeTimeoutEl = document.getElementById('modal-resume-timeout');
+    if (resumeTimeoutEl) {
+      resumeTimeoutEl.value = String(task.timeout || DEFAULT_TASK_TIMEOUT);
+    }
   } else {
     resumeSection.classList.add('hidden');
   }

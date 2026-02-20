@@ -329,6 +329,12 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 }
 
 func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	var req struct {
+		Timeout *int `json:"timeout"`
+	}
+	// Body is optional — ignore parse errors for backward compatibility.
+	json.NewDecoder(r.Body).Decode(&req)
+
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
@@ -343,7 +349,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	if err := h.store.ResumeTask(r.Context(), id); err != nil {
+	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
