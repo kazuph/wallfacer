@@ -768,4 +768,16 @@ pre.result-entry-body {
   .btn-yellow, .btn-green, .btn-accent {
     min-height: 36px;
   }
+
+  /* New-task create/edit form: add horizontal padding so the input and button
+     are not flush against the viewport edge (matches col-bg's 12px padding) */
+  #new-task-btn {
+    margin-left: 12px;
+    margin-right: 12px;
+    width: calc(100% - 24px);
+  }
+  #new-task-form {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
