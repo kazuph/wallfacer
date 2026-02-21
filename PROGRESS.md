@@ -1157,3 +1157,31 @@ Two changes made:
 - **`ui/js/modal.js:300`**: Updated the archive button visibility logic to show for both `done` and `cancelled` tasks (using an `isArchivable` flag)
 
 ---
+
+## Task: 0bfb1c49
+
+**Date**: 2026-02-21 09:50:16  
+**Branch**: task/0bfb1c49  
+**Commit**: `0bb8095132e6c833689295d620d08938c4d1f2f2`
+
+**Prompt**:
+> "Resume previous session" seems only occur when move from cancelled to backlog.
+> 
+> It should exists for all other cases, except start a fresh new task which was never executed before
+
+**Result**:
+Here's a summary of all changes made:
+
+**Root cause**: "Resume previous session" was only visible in the backlog state (card + modal edit section). The retry section for done/failed/cancelled tasks had no such option, so there was no way to express a session preference before clicking retry. Additionally, `cancelled → backlog` went through a simpler `UpdateTaskStatus` path while `done/failed → backlog` went through `ResetTaskForRetry` — now all three are unified.
+
+**Changes:**
+
+- **`ui/index.html`**: Added a "Resume previous session" checkbox (hidden by default) inside the retry section, below the prompt textarea.
+
+- **`ui/js/modal.js`**: When showing the retry section, if the task has a `session_id`, reveal the checkbox and pre-check it based on `!task.fresh_start` (defaults to checked = resume).
+
+- **`ui/js/tasks.js`** (`retryTask`): When the resume row is visible, include `fresh_start` in the PATCH body based on the checkbox state.
+
+- **`internal/store/tasks.go`** (`ResetTaskF...
+
+---
