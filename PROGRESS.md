@@ -1545,3 +1545,20 @@ All changes are in place. Here's a summary of what was done:
 `containers.js` was calling `escapeHTML` but `utils.js` defines `escapeHtml` (lowercase `tml`). Fixed all 7 call sites in `containers.js` to use the correct name.
 
 ---
+
+## Task: c3521c89
+
+**Date**: 2026-02-21 21:59:23  
+**Branch**: task/c3521c89  
+**Commit**: `97736d2b18a25f646c6ed766370b29e43eab1763`
+
+**Prompt**:
+> the header got bigger than before. this seems to be a regression. pls fix
+
+**Result**:
+These were both present in Tailwind's Preflight when using the CDN, but were lost when dependencies were bundled locally:
+
+- **`body { margin: 0; }`** — Removes the browser's default 8px body margin, which was creating a visible gap above the top navigation header
+- **Heading reset** — Removes the browser's default `margin-block: 0.83em` on `h2` elements; the column headers ("Backlog", "In Progress", etc.) had no explicit margin reset in `.col-header`, so they inherited ~10px top/bottom margins from the browser, making that row noticeably taller
+
+---
