@@ -1140,3 +1140,20 @@ The refactoring is complete. Here's a summary of what was done:
 | `internal/runner` | `runner.go`, `container.go`, `execute.go`, `commit.go`, `worktree.go`, `snapshot.go`, `progress.go`, `title.go`, `util.go`, `runner_test.go` | Container orchestration, commit pipeline |...
 
 ---
+
+## Task: 49c4b5a7
+
+**Date**: 2026-02-21 09:49:05  
+**Branch**: task/49c4b5a7  
+**Commit**: `f8806bfab7571b284619dac3765b76f4c3d65a21`
+
+**Prompt**:
+> cancelled tasks can also be marked as archived
+
+**Result**:
+Two changes made:
+
+- **`internal/handler/execute.go:193`**: Relaxed the archive guard to allow `cancelled` in addition to `done`
+- **`ui/js/modal.js:300`**: Updated the archive button visibility logic to show for both `done` and `cancelled` tasks (using an `isArchivable` flag)
+
+---
