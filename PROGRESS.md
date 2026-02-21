@@ -1408,3 +1408,29 @@ The fix adds explicit `list-style-type` values to both `.prose-content` and `.ca
 That's just the earlier failed `npx` attempt from when I was trying to use the network — it's stale. The `ui/css/tailwind.css` file was already written manually afterward and is in place. Nothing to fix here.
 
 ---
+
+## Task: 2bbd26f5
+
+**Date**: 2026-02-21 19:32:12  
+**Branch**: task/2bbd26f5  
+**Commit**: `45887fe8e67154c336b6e7a8ca33fc14d5040b23`
+
+**Prompt**:
+> write unit tests and make sure the test coverage up to 80%
+> 
+> focus on internal/runner package
+
+**Result**:
+Coverage target reached. Here's the final summary:
+
+**Coverage: 35.6% → 83.1%** (target was 80%)
+
+Three new test files were created:
+
+- **`execute_test.go`** — `Run()` state transitions (end_turn/waiting/is_error/max_tokens/container-error), `SyncWorktrees` paths (up-to-date, behind main, non-git, dirty stash), `failSync`
+- **`snapshot_test.go`** — `setupNonGitSnapshot`, `extractSnapshotToWorkspace`, non-git commit pipeline integration
+- **`misc_test.go`** — Runner getters, `isConflictError`, `runGit`, `CleanupWorktrees`, `PruneOrphanedWorktrees`, `runContainer` (success/error/parse-error/context-cancel), `buildContainerArgs`, `GenerateTitle`, `writeProgressMD`, **`resolveConflicts`** (success/container-error/is_error), **`setupWorktrees` idempotent path**
+
+The final push to 83.1% came from adding `resolveConflicts` tests (which was at 0%) and the `setupWorktrees` idempotent branch test.
+
+---
