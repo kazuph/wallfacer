@@ -1352,3 +1352,28 @@ The monolithic file is replaced with 5 focused test files + 1 helpers file:
 Coverage stays at **90.3%**.
 
 ---
+
+## Task: 5dd48a3d
+
+**Date**: 2026-02-21 19:16:50  
+**Branch**: task/5dd48a3d  
+**Commit**: `a115d16a51503daef6f3cc4d033dbed75c31657d`
+
+**Prompt**:
+> waiting tasks can only be moved back to "backlog"? why is that the case? there should be a resume task implmeneted before but seems not existing for the failed/timeout tasks
+
+**Result**:
+Clean build. Here's what was changed and why:
+
+**Root cause of the gap:**
+The retry path (`→ backlog`) in `handler/tasks.go:99` only accepted `done/failed/cancelled` as source states — `waiting` was excluded. Correspondingly, `modal.js` only showed the Retry section for those same states.
+
+**The two changes:**
+
+1. **`handler/tasks.go`** — added `waiting` to the retry transition guard. A waiting task retried to backlog runs through the same path as a cancelled task: worktrees are cleaned up, the prompt is optionally updated, and `fresh_start` controls whether the session is preserved.
+
+2. **`ui/js/modal.js`** — added `waiting` to the condition that shows the Retry section in the modal. This means a waiting task will now display the same retry UI (editable prompt + optional "resume session" checkbox) as failed/done/cancelled tasks.
+
+**Re: failed tasks without a session_id** — there's nothing broken there. If a task times out before Claude returns *any* output (no session establ...
+
+---
