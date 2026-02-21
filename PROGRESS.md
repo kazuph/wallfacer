@@ -1697,3 +1697,19 @@ The changes are done:
 - **`ui/js/instructions.js`**: Removed `reinitInstructions()` (the settings-panel variant) and the `_doReinit()` helper. Merged the logic directly into `reinitInstructionsFromEditor()`, which remains in the edit modal.
 
 ---
+
+## Task: dd6e89b5
+
+**Date**: 2026-02-21 23:02:14  
+**Branch**: task/dd6e89b5  
+**Commit**: `6670277b5c799f93e7493c3e649f5fbf32916854`
+
+**Prompt**:
+> investigate options what else are needed to making this app running on cloud, or running locally as a native app than relying on browser app.
+
+**Result**:
+Written to `/workspace/wallfacer/plans/cloud-and-native-deployment.md`.
+
+The file covers all three cloud options (VPS+Caddy, Docker-in-Docker, K8s+Job API) and both native app approaches (system tray wrapper, Wails), including concrete code sketches, a decision matrix, and the recommended path for each direction. It also calls out the container runtime as the unavoidable constraint that applies regardless of deployment choice.
+
+---
