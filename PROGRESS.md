@@ -1251,3 +1251,19 @@ Triggers on `v*` tags. Builds a multi-arch image (`linux/amd64` + `linux/arm64`)
 - Added `ensureImage(containerCmd, sandboxImage)` called at server startup: checks local image presence, and if absent, runs `...
 
 ---
+
+## Task: 379cbcf5
+
+**Date**: 2026-02-21 15:27:17  
+**Branch**: task/379cbcf5  
+**Commit**: `97669742373d38b57c59a6d26b944ab18bd53bf2`
+
+**Prompt**:
+> write unit tests and make sure the test coverage up to 80%
+> 
+> focus on internal/logger package
+
+**Result**:
+Done.
+
+---
