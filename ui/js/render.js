@@ -139,6 +139,25 @@ function createCard(t) {
   return card;
 }
 
+function buildCardActions(t) {
+  if (t.archived) return '';
+  const parts = [];
+  if (t.status === 'backlog') {
+    parts.push(`<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`);
+  } else if (t.status === 'waiting') {
+    parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Mark done</button>`);
+  } else if (t.status === 'failed') {
+    if (t.session_id) {
+      parts.push(`<button class="card-action-btn card-action-resume" onclick="event.stopPropagation();quickResumeTask('${t.id}',${t.timeout || 15})" title="Resume in existing session">&#8635; Resume</button>`);
+    }
+    parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
+  } else if (t.status === 'done' || t.status === 'cancelled') {
+    parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
+  }
+  if (!parts.length) return '';
+  return `<div class="card-actions">${parts.join('')}</div>`;
+}
+
 function updateCard(card, t) {
   const isArchived = !!t.archived;
   const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
@@ -178,5 +197,6 @@ function updateCard(card, t) {
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
+    ${buildCardActions(t)}
   `;
 }

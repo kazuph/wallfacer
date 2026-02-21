@@ -226,6 +226,35 @@ async function unarchiveTask() {
   }
 }
 
+// --- Quick card actions (no modal required) ---
+
+async function quickDoneTask(id) {
+  try {
+    await api(`/api/tasks/${id}/done`, { method: 'POST' });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error completing task: ' + e.message);
+  }
+}
+
+async function quickResumeTask(id, timeout) {
+  try {
+    await api(`/api/tasks/${id}/resume`, { method: 'POST', body: JSON.stringify({ timeout }) });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error resuming task: ' + e.message);
+  }
+}
+
+async function quickRetryTask(id) {
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'backlog' }) });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error retrying task: ' + e.message);
+  }
+}
+
 // --- Sync with latest (rebase worktree onto default branch) ---
 
 async function syncTask(id) {
