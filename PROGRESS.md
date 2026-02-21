@@ -1627,3 +1627,22 @@ Done. Here's what was added:
 - `styles.css`: Added `.card-actions`, `.card-action-btn`, and per-variant classes (`card-action-start`, `card-action-done`, `card-action-resume`, `card-action-retry`) with l...
 
 ---
+
+## Task: e3fb860b
+
+**Date**: 2026-02-21 22:31:36  
+**Branch**: task/e3fb860b  
+**Commit**: `d99a6af7a7617ab389a136b5ed2c027ca3cd2217`
+
+**Prompt**:
+> css style in mobile, do not have enough margin or padding in the task create edit input box. it is too close to the left edge of the window
+
+**Result**:
+The fix adds to the mobile (`≤768px`) media query:
+
+- **`#new-task-form`** — `padding-left/right: 12px` so the textarea is inset 12px from the column wrapper edge, giving 24px total from the viewport edge (same as the `.col-bg` task cards below it).
+- **`#new-task-btn`** — `margin-left/right: 12px` + `width: calc(100% - 24px)` so the dashed "New Task" button border is consistently inset, not flush to the edge.
+
+This only applies on mobile; desktop layout is unchanged.
+
+---
