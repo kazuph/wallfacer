@@ -8,7 +8,7 @@ NAME       := wallfacer
 -include .env
 export
 
-.PHONY: build server run shell clean
+.PHONY: build server run shell clean ui-css
 
 # Build the sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
@@ -56,6 +56,12 @@ shell:
 		-w /workspace \
 		--entrypoint /bin/bash \
 		$(IMAGE)
+
+# Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
+# Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
+ui-css:
+	npx tailwindcss@3 -i tailwind.input.css -o ui/css/tailwind.css \
+		--content './ui/**/*.{html,js}' --minify
 
 # Remove the sandbox image
 clean:
