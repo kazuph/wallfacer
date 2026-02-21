@@ -1666,3 +1666,17 @@ ESC key support is now added. When pressed, the handler checks modals in priorit
 This matches the existing pattern in `events.js:9-15`.
 
 ---
+
+## Task: c01856d1
+
+**Date**: 2026-02-21 22:33:06  
+**Branch**: task/c01856d1  
+**Commit**: `81de90cb1df582eef2f1901e5a8ba57c82bf88e0`
+
+**Prompt**:
+> add esc button exit support to claude.md edit window
+
+**Result**:
+The ESC key handler in `events.js` now checks if the instructions modal is open and calls `closeInstructionsEditor()` before falling through to `closeModal()`. The priority order is: alert modal → instructions modal → task modal.
+
+---
