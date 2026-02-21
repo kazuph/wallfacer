@@ -1103,3 +1103,40 @@ The arg-building block inside `runContainer` was pulled into a new `buildContain
 | `reinitWorkspaceInstructions` | overwrites stale/cust...
 
 ---
+
+## Task: fb713500
+
+**Date**: 2026-02-21 09:39:25  
+**Branch**: task/fb713500  
+**Commit**: `6d9efd51595b8d9d6221ea73dfb57d1e850ee976`
+
+**Prompt**:
+> currently the go server is too complex. refactor the code base without breaking any existing feature, separate by packages and put into ./internal folder
+> 
+> Refactor goals:
+> 
+> - maximum reuse existing feature
+> - think about abstractions and patterns
+> - modularize components into different packages, extract core and stable functions so that complex logic can be encapsulated for faster reviews
+> - break down to smaller code files and ensure roughly 200~300 lines per file
+
+**Result**:
+The refactoring is complete. Here's a summary of what was done:
+
+## Refactoring Summary
+
+**From:** 6 flat files in `package main` (~3,800 lines total)
+
+**To:** 32 files across 7 internal packages + 2 main package files
+
+### Package Structure
+
+| Package | Files | Responsibility |
+|---|---|---|
+| `internal/logger` | `logger.go` | Structured logging, named loggers (`Runner`, `Store`, `Git`, etc.) |
+| `internal/store` | `models.go`, `store.go`, `tasks.go`, `events.go`, `subscribe.go`, `io.go` | Task persistence, event sourcing, SSE subscriptions |
+| `internal/gitutil` | `repo.go`, `worktree.go`, `ops.go`, `stash.go`, `status.go` | Git operations — worktrees, rebase, merge, stash |
+| `internal/instructions` | `instructions.go`, `instructions_test.go` | Workspace CLAUDE.md management |
+| `internal/runner` | `runner.go`, `container.go`, `execute.go`, `commit.go`, `worktree.go`, `snapshot.go`, `progress.go`, `title.go`, `util.go`, `runner_test.go` | Container orchestration, commit pipeline |...
+
+---
