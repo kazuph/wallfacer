@@ -1448,3 +1448,30 @@ The final push to 83.1% came from adding `resolveConflicts` tests (which was at 
 Changed `rows="4"` to `rows="6"` on the new task textarea (`ui/index.html:108`). This adds two extra lines of height (~45px), bringing the textarea closer to the visual height of in-progress cards which include a badge header row, optional title, and up to ~4.5em of prompt text.
 
 ---
+
+## Task: 01fa3f8e
+
+**Date**: 2026-02-21 19:35:25  
+**Branch**: task/01fa3f8e  
+**Commit**: `180f0656bdf6036caf845c809702650b2e630e64`
+
+**Prompt**:
+> in the system setting, i want to have a monitoring panel to mimic the behavior of "docker ps -a" to inspect the current running sanboxes, their container status, etc.
+
+**Result**:
+Build is clean. Here's a summary of what was added:
+
+---
+
+**Backend**
+
+- `internal/runner/runner.go` — `ListContainers()` method that runs `<runtime> ps -a --filter name=wallfacer --format json`, parses the output, strips the Docker `/`-prefix from names, and extracts the task UUID from `wallfacer-<uuid>` container names. Returns a `[]ContainerInfo` slice.
+- `internal/handler/containers.go` — `GetContainers` handler, calls the runner and writes JSON.
+- `server.go` — Route `GET /api/containers` registered.
+
+**Frontend**
+
+- `ui/index.html` — New **"Sandbox Containers"** section in the settings panel with a **Monitor** button, plus a full-screen modal with a `docker ps -a`-style table (Container ID, Task, Image, State, Status, Created).
+- `ui/js/containers.js` — Opens/closes the modal, fetches `/api/containers`, auto-refreshes every 5 s while open, renders the table. The **Task** column cross-references the live task list to show the task title and status badge. The **State** co...
+
+---
