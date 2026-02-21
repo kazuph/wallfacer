@@ -461,6 +461,64 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	}
 }
 
+// TestBuildContainerArgsWorktreeGitDirMount verifies that when a workspace has
+// a worktree override and the original workspace is a git repo, the main repo's
+// .git directory is mounted at its host path so the worktree's .git file
+// reference resolves correctly inside the container.
+func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
+	// Create a real git repo so .git directory exists.
+	repo := setupTestRepo(t)
+	wt := t.TempDir()
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{
+		Command:      "podman",
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+	})
+	args := r.buildContainerArgs("name", "prompt", "", map[string]string{repo: wt})
+
+	// The main repo's .git should be mounted at the same host path.
+	gitDir := filepath.Join(repo, ".git")
+	expectedGitMount := gitDir + ":" + gitDir + ":z"
+	if !containsConsecutive(args, "-v", expectedGitMount) {
+		t.Fatalf("expected .git dir mount %q; got: %v", expectedGitMount, args)
+	}
+}
+
+// TestBuildContainerArgsNoGitDirMountWithoutWorktree verifies that when no
+// worktree override is used, no extra .git directory mount is added.
+func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{
+		Command:      "podman",
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+	})
+	// No worktree override — direct mount of workspace.
+	args := r.buildContainerArgs("name", "prompt", "", nil)
+
+	gitDir := filepath.Join(repo, ".git")
+	gitMount := gitDir + ":" + gitDir + ":z"
+	if containsConsecutive(args, "-v", gitMount) {
+		t.Fatalf("should NOT mount .git dir separately when no worktree override; found %q", gitMount)
+	}
+}
+
 // TestBuildContainerArgsNoSessionID verifies that omitting sessionID means
 // --resume is NOT added to the args.
 func TestBuildContainerArgsNoSessionID(t *testing.T) {

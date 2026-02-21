@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"changkun.de/wallfacer/internal/logger"
@@ -70,6 +71,17 @@ func (r *Runner) buildContainerArgs(containerName, prompt, sessionID string, wor
 				basename = parts[len(parts)-2]
 			}
 			args = append(args, "-v", hostPath+":/workspace/"+basename+":z")
+
+			// Git worktrees have a .git file (not directory) that references
+			// the main repo's .git/worktrees/<name>/ using an absolute host
+			// path. Mount the main repo's .git directory at the same host
+			// path inside the container so git operations work correctly.
+			if _, isWorktree := worktreeOverrides[ws]; isWorktree {
+				gitDir := filepath.Join(ws, ".git")
+				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
+					args = append(args, "-v", gitDir+":"+gitDir+":z")
+				}
+			}
 		}
 	}
 
