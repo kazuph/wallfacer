@@ -1213,3 +1213,41 @@ Here's a summary of all changes made:
 | `TestHostStageAndCommitFallsBackOnContainerFailure` |...
 
 ---
+
+## Task: 3ba5f21f
+
+**Date**: 2026-02-21 15:25:23  
+**Branch**: task/3ba5f21f  
+**Commit**: `6d240c7094f7b52f0905dcaa268791580f6df9eb`
+
+**Prompt**:
+> currently wallfacer requires a sandbox image in the setup process.
+> 
+> I want to simplify this for the users:
+> 
+> 1. build, release, and publish the image in github using github actions
+> 
+> 2. let the wallfacer command line download the image from github if not available locally
+> 
+> 3. make sure the wallfacer env validator checks the availability of the claude code image
+
+**Result**:
+Everything looks correct. Here's a summary of all changes made:
+
+---
+
+**1. `.github/workflows/release.yml` (new file)**
+
+Triggers on `v*` tags. Builds a multi-arch image (`linux/amd64` + `linux/arm64`) from `sandbox/Dockerfile` using Docker Buildx with GitHub Actions cache, then pushes to `ghcr.io/<owner>/wallfacer` with tags `latest`, `<major>.<minor>`, and `<version>`. Uses `GITHUB_TOKEN` — no extra secrets needed.
+
+**2. `main.go`**
+
+- Added `const defaultSandboxImage = "ghcr.io/changkun/wallfacer:latest"` as the single source of truth.
+- `wallfacer env` now checks image availability after confirming the container runtime is present. It runs `podman images -q <image>` and reports `[ok]` if found locally, or `[!]` with the manual pull command if not.
+
+**3. `server.go`**
+
+- The `-image` flag now defaults to `defaultSandboxImage` instead of `wallfacer:latest`.
+- Added `ensureImage(containerCmd, sandboxImage)` called at server startup: checks local image presence, and if absent, runs `...
+
+---
