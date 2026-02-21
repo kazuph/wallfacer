@@ -1185,3 +1185,31 @@ Here's a summary of all changes made:
 - **`internal/store/tasks.go`** (`ResetTaskF...
 
 ---
+
+## Task: d77809e2
+
+**Date**: 2026-02-21 15:16:08  
+**Branch**: task/d77809e2  
+**Commit**: `031b60edc2af25cac3541fdcdd0d033d1abf30d2`
+
+**Prompt**:
+> commit message currently not explainatory
+> 
+> similar to title generation, use a container to generate commit message
+
+**Result**:
+`internal/runner/commit_test.go` adds 9 tests covering the full `generateCommitMessage` flow:
+
+| Test | What it covers |
+|---|---|
+| `TestGenerateCommitMessageSuccess` | Valid stream-json → parsed result returned |
+| `TestGenerateCommitMessageFallbackOnInvalidOutput` | Non-JSON output → `wallfacer: <first-line>` fallback |
+| `TestGenerateCommitMessageFallbackOnCommandError` | Exit-1 + empty stdout → fallback |
+| `TestGenerateCommitMessageFallbackOnBlankResult` | Valid JSON with `"result":""` → fallback |
+| `TestGenerateCommitMessageFallbackTruncatesLongPrompt` | Fallback honours the 72-char truncation limit |
+| `TestGenerateCommitMessageMultiline` | Subject + body commit message preserved intact |
+| `TestGenerateCommitMessageNDJSON` | NDJSON stream parsed by finding the last valid JSON object |
+| `TestHostStageAndCommitUsesGeneratedMessage` | Integration: changes + valid container → commit subject equals generated text |
+| `TestHostStageAndCommitFallsBackOnContainerFailure` |...
+
+---
