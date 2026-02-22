@@ -199,11 +199,15 @@ function updateCard(card, t) {
     </div>` : ''}
     ${t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
     <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
-    ${(t.status === 'failed' || t.status === 'waiting') && t.result ? `
+    ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
-      <span class="card-error-label">${t.status === 'failed' ? 'Error' : 'Output'}</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
+      <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
     </div>
     ${t.stop_reason ? `<div style="margin-top:4px;"><span class="badge badge-failed" style="font-size:9px;">${escapeHtml(t.stop_reason)}</span></div>` : ''}
+    ` : t.status === 'waiting' && t.result ? `
+    <div class="card-output-reason">
+      <span class="card-output-label">Output</span><span class="card-output-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
+    </div>
     ` : t.result ? `
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
     ` : ''}
