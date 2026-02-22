@@ -34,7 +34,7 @@ func runServer(configDir string, args []string) {
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
 	addr := fs.String("addr", envOrDefault("ADDR", "127.0.0.1:8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
-	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"), "container runtime command")
+	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "docker"), "container runtime command")
 	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")

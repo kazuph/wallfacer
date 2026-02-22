@@ -24,7 +24,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `GET /api/tasks/stream` | SSE: push task list on any state change |
 | `GET /api/tasks/{id}/events` | Return full event trace log |
 | `GET /api/tasks/{id}/outputs/{filename}` | Serve raw turn output file |
-| `GET /api/tasks/{id}/logs` | SSE: stream live `podman logs -f` output |
+| `GET /api/tasks/{id}/logs` | SSE: stream live `docker logs -f` output |
 | `GET /api/git/status` | Current branch / remote status for all workspaces |
 | `GET /api/git/stream` | SSE: poll git status every few seconds |
 | `POST /api/git/push` | Run `git push` on a workspace |
@@ -64,7 +64,7 @@ Tasks are long-running and IO-bound (container execution, git operations), so go
 Each turn launches an ephemeral container:
 
 ```
-podman run --rm \
+docker run --rm \
   --name wallfacer-<uuid> \
   --env-file ~/.wallfacer/.env \
   -v claude-config:/home/claude/.claude \
@@ -85,7 +85,7 @@ podman run --rm \
 - Output is captured as NDJSON, parsed, and saved to disk
 - Stderr is saved separately if non-empty
 
-The container name `wallfacer-<uuid>` lets the server stream logs with `podman logs -f wallfacer-<uuid>` while the container is running.
+The container name `wallfacer-<uuid>` lets the server stream logs with `docker logs -f wallfacer-<uuid>` while the container is running.
 
 ## SSE Live Update Flow
 
@@ -107,7 +107,7 @@ UI receives event → re-renders board
 
 The same pattern applies to `GET /api/git/stream`, except the source is a time-based ticker (polling `git status` every few seconds) rather than a store write signal.
 
-Live container logs use a different mechanism: `GET /api/tasks/{id}/logs` opens a process pipe to `podman logs -f <name>` and streams its stdout line-by-line as SSE events.
+Live container logs use a different mechanism: `GET /api/tasks/{id}/logs` opens a process pipe to `docker logs -f <name>` and streams its stdout line-by-line as SSE events.
 
 ## Store Concurrency
 

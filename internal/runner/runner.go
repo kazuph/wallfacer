@@ -22,8 +22,8 @@ type ContainerInfo struct {
 	CreatedAt int64  `json:"created_at"` // unix timestamp
 }
 
-// podmanContainer is used to unmarshal `podman/docker ps --format json` output.
-type podmanContainer struct {
+// containerInfo is used to unmarshal `docker ps --format json` output.
+type containerInfo struct {
 	ID      string   `json:"Id"`
 	Names   []string `json:"Names"`
 	Image   string   `json:"Image"`
@@ -43,7 +43,7 @@ func (r *Runner) ListContainers() ([]ContainerInfo, error) {
 		return nil, err
 	}
 
-	var raw []podmanContainer
+	var raw []containerInfo
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	}
 }
 
-// Command returns the container runtime binary path (podman/docker).
+// Command returns the container runtime binary path (docker).
 func (r *Runner) Command() string {
 	return r.command
 }

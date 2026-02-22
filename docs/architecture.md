@@ -14,7 +14,7 @@ Wallfacer is a Kanban task runner that executes Claude Code in isolated sandbox 
 │  Go Server (native on host)                                 │
 │  main.go · handler.go · runner.go · store.go · git.go      │
 └──────┬──────────────────────────────────────┬───────────────┘
-       │ os/exec (podman/docker)              │ git commands
+       │ os/exec (docker)                     │ git commands
 ┌──────▼──────────────┐              ┌────────▼──────────────┐
 │  Sandbox Container  │              │  Git Worktrees        │
 │  Ubuntu 24.04       │              │  ~/.wallfacer/        │
@@ -22,7 +22,7 @@ Wallfacer is a Kanban task runner that executes Claude Code in isolated sandbox 
 └─────────────────────┘              └───────────────────────┘
 ```
 
-The Go server runs natively on the host and persists tasks to per-task directories. It launches ephemeral sandbox containers via `podman run` (or `docker run`). Each task gets its own git worktree so multiple tasks can run concurrently without interfering.
+The Go server runs natively on the host and persists tasks to per-task directories. It launches ephemeral sandbox containers via `docker run`. Each task gets its own git worktree so multiple tasks can run concurrently without interfering.
 
 ## Technology Stack
 
@@ -30,7 +30,7 @@ The Go server runs natively on the host and persists tasks to per-task directori
 
 **Frontend** — Vanilla JavaScript, Tailwind CSS, Sortable.js, Marked.js. `EventSource` (SSE) for live updates, `localStorage` for theme preferences.
 
-**Infrastructure** — Podman or Docker as container runtime. Ubuntu 24.04 sandbox image with Claude Code CLI installed. Git worktrees for per-task isolation.
+**Infrastructure** — Docker as container runtime (configurable via `-container` flag). Ubuntu 24.04 sandbox image with Claude Code CLI installed. Git worktrees for per-task isolation.
 
 **Persistence** — Filesystem only, no database. `~/.wallfacer/data/<uuid>/` per task. Atomic writes via temp file + `os.Rename`.
 
@@ -102,7 +102,7 @@ All flags have env var fallbacks:
 |------|---------|---------|-------------|
 | `-addr` | `ADDR` | `:8080` | Listen address |
 | `-data` | `DATA_DIR` | `~/.wallfacer/data` | Data directory |
-| `-container` | `CONTAINER_CMD` | `/opt/podman/bin/podman` | Container runtime command |
+| `-container` | `CONTAINER_CMD` | `docker` | Container runtime command |
 | `-image` | `SANDBOX_IMAGE` | `wallfacer:latest` | Sandbox container image |
 | `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
 | `-no-browser` | — | `false` | Do not open browser on start |

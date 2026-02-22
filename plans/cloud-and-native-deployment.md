@@ -6,7 +6,7 @@
 
 The app has three hard runtime dependencies that shape all deployment options:
 
-1. **Container runtime** (`podman`/`docker` via `os/exec`) — required for every task execution
+1. **Container runtime** (`docker` via `os/exec`) — required for every task execution
 2. **Git** on the host — worktrees, rebase, merge all run on the host
 3. **Workspace directories** must exist on the machine running the Go server
 4. **No authentication** — the HTTP server is open to anyone who can reach port 8080
@@ -17,7 +17,7 @@ The app has three hard runtime dependencies that shape all deployment options:
 
 ### A1. VPS + Reverse Proxy (lowest effort, works today)
 
-Deploy the Go binary to any Linux VM (EC2, Hetzner, DigitalOcean, etc.) with Docker/Podman installed.
+Deploy the Go binary to any Linux VM (EC2, Hetzner, DigitalOcean, etc.) with Docker installed.
 
 **What already works:**
 - `-no-browser` flag exists
@@ -31,7 +31,7 @@ Deploy the Go binary to any Linux VM (EC2, Hetzner, DigitalOcean, etc.) with Doc
 | Authentication — server is fully open | Add HTTP basic auth middleware (~50 lines in Go), or put Caddy/Nginx in front with `basicauth` |
 | HTTPS | Caddy with `tls` block handles it automatically |
 | Workspace repos must be on the VM | `git clone` or rsync repos to the VM at setup |
-| Container runtime | Install Docker or Podman on the VM |
+| Container runtime | Install Docker on the VM |
 | Persistent storage | Mount a volume at `~/.wallfacer/` |
 | Survives reboots | Write a systemd unit file |
 
@@ -41,7 +41,7 @@ This is deployable with about a day of infrastructure work. The biggest practica
 ```
 Internet → Caddy (HTTPS + basicauth) → wallfacer :8080
                                              ↓
-                                        Podman (local tasks)
+                                        Docker (local tasks)
                                              ↓
                                /home/user/repos/<workspace>
 ```
@@ -78,10 +78,10 @@ wallfacer.example.com {
 
 Run the wallfacer Go server inside a container, which then needs to spawn task containers.
 
-**Problem:** The server uses `os/exec` to call `podman run`. Inside a container this requires one of:
+**Problem:** The server uses `os/exec` to call `docker run`. Inside a container this requires one of:
 - Mounting the Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock`) — gives the container root-equivalent access to the host; a deliberate security trade-off
 - Docker-in-Docker (DinD) with `--privileged` — fragile, not recommended in production
-- Podman rootless inside a container — complex, kernel version dependent
+- Rootless container runtime — complex, kernel version dependent
 
 **When to choose this:** Only if a platform (Railway, Render, Fly.io) requires the server to be containerized. The socket-mount approach works but must be a conscious security decision.
 
@@ -95,7 +95,7 @@ Replace `os/exec` container spawning with the Kubernetes `batch/v1 Job` API. Tas
 
 | Component | Current | Cloud-native replacement |
 |-----------|---------|--------------------------|
-| Task execution | `podman run` via `os/exec` | `client-go` creating K8s Jobs |
+| Task execution | `docker run` via `os/exec` | `client-go` creating K8s Jobs |
 | Persistence | `~/.wallfacer/data/` filesystem | PostgreSQL or similar |
 | Worktrees | Local git worktrees | Per-task PVCs or init containers |
 | Log streaming | Container stdout via `os/exec` pipe | `k8s.io/client-go` pod log stream |
@@ -174,7 +174,7 @@ func main() {
 | Build toolchain | `wails build` replaces `go build` |
 
 **Wails does NOT replace:**
-- Container runtime — user still needs Docker Desktop or Podman installed
+- Container runtime — user still needs Docker Desktop (or any Docker-compatible runtime) installed
 - Git — still required on the host
 
 **Wails app skeleton:**
@@ -223,4 +223,4 @@ Would run the Go binary as a child process. Adds ~150 MB for bundled Chromium, i
 
 **For native desktop:** **B2 (Wails)** gives the best end-user experience — no browser tab, proper window, dock icon, OS-native feel. The existing Go + vanilla JS architecture is a near-perfect fit. **B1 (system tray)** is a lower-risk stepping stone and can ship first.
 
-**Container runtime is unavoidable in both paths.** Users need Docker Desktop or Podman installed. That is a fundamental requirement baked into the current architecture, not a deployment detail.
+**Container runtime is unavoidable in both paths.** Users need Docker installed. That is a fundamental requirement baked into the current architecture, not a deployment detail.

@@ -73,7 +73,7 @@ Alternatively, the user can mark the task done from `waiting`, which skips furth
 
 Any task in `backlog`, `in_progress`, `waiting`, or `failed` can be cancelled via `POST /api/tasks/{id}/cancel`. The handler:
 
-1. **Kills the container** (if `in_progress`) — sends `podman kill wallfacer-<uuid>`. The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
+1. **Kills the container** (if `in_progress`) — sends `docker kill wallfacer-<uuid>`. The running goroutine detects the cancelled status and exits without overwriting it to `failed`.
 2. **Cleans up worktrees** — removes the git worktree and deletes the task branch, discarding all prepared changes.
 3. **Sets status to `cancelled`** and appends a `state_change` event.
 4. **Preserves history** — `data/<uuid>/traces/` and `data/<uuid>/outputs/` are left intact so execution logs, token usage, and the event timeline remain visible.
@@ -147,4 +147,4 @@ On startup, `recoverOrphanedTasks` in `server.go` reconciles tasks that were int
 The task may have produced useful partial output. Moving to `waiting` lets the user inspect results and choose the next action (resume with feedback, mark as done, or cancel) rather than forcing a retry from scratch.
 
 **Monitor goroutine** (`monitorContainerUntilStopped`):
-When a container is found still running after a restart, a background goroutine polls `podman/docker ps` every 5 seconds. Once the container stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
+When a container is found still running after a restart, a background goroutine polls `docker ps` every 5 seconds. Once the container stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.

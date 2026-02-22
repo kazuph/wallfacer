@@ -1,5 +1,5 @@
 SHELL      := /bin/bash
-PODMAN     := /opt/podman/bin/podman
+CONTAINER  := docker
 IMAGE      := wallfacer:latest
 GHCR_IMAGE := ghcr.io/changkun/wallfacer:latest
 NAME       := wallfacer
@@ -13,7 +13,7 @@ export
 # Build the sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
 build:
-	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/Dockerfile sandbox/
+	$(CONTAINER) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/Dockerfile sandbox/
 
 # Build and run the Go server natively
 server:
@@ -36,7 +36,7 @@ run:
 ifndef PROMPT
 	$(error PROMPT is required. Usage: make run PROMPT="your task here")
 endif
-	@$(PODMAN) run --rm -it \
+	@$(CONTAINER) run --rm -it \
 		--name $(NAME) \
 		--env-file .env \
 		$(GITCONFIG_MOUNT) \
@@ -47,7 +47,7 @@ endif
 
 # Debug shell into a sandbox container
 shell:
-	$(PODMAN) run --rm -it \
+	$(CONTAINER) run --rm -it \
 		--name $(NAME)-shell \
 		--env-file .env \
 		$(GITCONFIG_MOUNT) \
@@ -65,4 +65,4 @@ ui-css:
 
 # Remove the sandbox image
 clean:
-	-$(PODMAN) rmi $(IMAGE) $(GHCR_IMAGE)
+	-$(CONTAINER) rmi $(IMAGE) $(GHCR_IMAGE)

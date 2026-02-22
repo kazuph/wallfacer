@@ -21,8 +21,8 @@ import (
 // TestRunnerCommand verifies that Command() returns the configured binary path.
 func TestRunnerCommand(t *testing.T) {
 	r := newTestRunnerWithInstructions(t, "")
-	if r.Command() != "podman" {
-		t.Fatalf("expected command 'podman', got %q", r.Command())
+	if r.Command() != "docker" {
+		t.Fatalf("expected command 'docker', got %q", r.Command())
 	}
 }
 
@@ -420,7 +420,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
+		Command:      "docker",
 		SandboxImage: "test:latest",
 		EnvFile:      envFile,
 	})
@@ -444,7 +444,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
+		Command:      "docker",
 		SandboxImage: "test:latest",
 		Workspaces:   ws,
 	})
@@ -478,7 +478,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
+		Command:      "docker",
 		SandboxImage: "test:latest",
 		Workspaces:   repo,
 	})
@@ -505,7 +505,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{
-		Command:      "podman",
+		Command:      "docker",
 		SandboxImage: "test:latest",
 		Workspaces:   repo,
 	})

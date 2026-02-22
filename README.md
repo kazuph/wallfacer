@@ -7,7 +7,7 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
 ## Features
 
 - **Kanban board** — visual task management with Backlog, In Progress, Waiting, Done, and Cancelled columns
-- **Isolated sandbox execution** — each task runs in an ephemeral Podman/Docker container; tasks can run in parallel without interfering
+- **Isolated sandbox execution** — each task runs in an ephemeral Docker container; tasks can run in parallel without interfering
 - **Git worktree isolation** — every task gets its own git branch and worktree so concurrent changes never conflict
 - **Human-in-the-loop feedback** — when Claude needs clarification, the card moves to Waiting; submit feedback to resume execution
 - **Auto commit and push** — completed task changes are automatically committed and pushed to the remote
@@ -22,7 +22,7 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+
-- [Podman](https://podman.io/) or [Docker](https://www.docker.com/)
+- [Docker](https://www.docker.com/) (or any Docker-compatible runtime)
 - A Claude credential — either:
   - An **OAuth token** from `claude setup-token` (requires Claude Pro or Max), or
   - An **Anthropic API key** (`sk-ant-...`) from [console.anthropic.com](https://console.anthropic.com/)

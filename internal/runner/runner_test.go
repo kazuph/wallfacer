@@ -86,7 +86,7 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 	}
 	t.Cleanup(func() { s.Close() })
 	return NewRunner(s, RunnerConfig{
-		Command:          "podman",
+		Command:          "docker",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsPath,
 	})
@@ -197,7 +197,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
+		Command:          "docker",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws,
@@ -237,7 +237,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
+		Command:          "docker",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws1 + " " + ws2,
@@ -268,7 +268,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	runner := NewRunner(s, RunnerConfig{
-		Command:          "podman",
+		Command:          "docker",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws,

@@ -58,7 +58,7 @@ func runEnvCheck(configDir string) {
 	fmt.Printf("Config directory:  %s\n", configDir)
 	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
-	fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"))
+	fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", "docker"))
 	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage))
 	fmt.Println()
 
@@ -122,7 +122,7 @@ func runEnvCheck(configDir string) {
 		fmt.Printf("[ ] CLAUDE_CODE_MODEL not set (using Claude Code default)\n")
 	}
 
-	containerCmd := envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman")
+	containerCmd := envOrDefault("CONTAINER_CMD", "docker")
 	if _, err := exec.LookPath(containerCmd); err != nil {
 		fmt.Printf("[!] Container runtime not found: %s\n", containerCmd)
 	} else {

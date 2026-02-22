@@ -159,18 +159,20 @@ func TestMaskToken(t *testing.T) {
 		{"", ""},
 		{"short", "*****"},
 		{"12345678", "********"},
-		{"abcdefghij", "abcd...ghij"},
-		{"sk-ant-abc123xyz", "sk-a...xyza"},
+		{"abcdefghij", "**********"},
+		{"abcdefghijkl", "************"},
+		{"abcdefghijklm", "abc...klm"},
+		{"sk-ant-abc123xyz", "sk-...xyz"},
 	}
 	// Re-check last one properly:
 	for _, tc := range tests {
 		got := envconfig.MaskToken(tc.input)
-		if tc.input == "sk-ant-abc123xyz" {
-			// just check it's masked (prefix...suffix format)
-			if !strings.Contains(got, "...") && len(tc.input) > 8 {
-				t.Errorf("MaskToken(%q) = %q; expected masked form", tc.input, got)
+		if tc.want != "" && strings.Contains(tc.want, "...") {
+			// For masked tokens, verify format: prefix...suffix
+			if !strings.Contains(got, "...") {
+				t.Errorf("MaskToken(%q) = %q; expected masked form with '...'", tc.input, got)
+				continue
 			}
-			continue
 		}
 		if got != tc.want {
 			t.Errorf("MaskToken(%q) = %q; want %q", tc.input, got, tc.want)

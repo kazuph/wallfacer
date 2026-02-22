@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Wallfacer is a Kanban task runner for Claude Code. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger Claude Code execution in an isolated sandbox container, and results are inspected when done.
 
-**Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (podman/docker). Each task gets its own git worktree for isolation.
+**Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (Docker). Each task gets its own git worktree for isolation.
 
 For detailed documentation see `docs/`.
 
@@ -30,7 +30,7 @@ wallfacer run -addr :9090 -no-browser        # Custom port, no browser
 wallfacer env                                # Show config and env status
 ```
 
-The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.
+The Makefile uses Docker by default. Adjust `CONTAINER` variable if using a different runtime.
 
 ## Server Development
 
