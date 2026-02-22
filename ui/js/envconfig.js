@@ -2,7 +2,7 @@
 
 async function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
-  closeSettings();
+  document.getElementById('settings-panel').classList.add('hidden');
 
   let cfg = { oauth_token: '', api_key: '', base_url: '', model: '' };
   try {
