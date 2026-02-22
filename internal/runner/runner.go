@@ -117,6 +117,11 @@ func (r *Runner) Command() string {
 	return r.command
 }
 
+// EnvFile returns the path to the env file used for containers.
+func (r *Runner) EnvFile() string {
+	return r.envFile
+}
+
 // Workspaces returns the list of configured workspace paths.
 func (r *Runner) Workspaces() []string {
 	if r.workspaces == "" {

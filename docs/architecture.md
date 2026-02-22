@@ -45,6 +45,13 @@ wallfacer/
 ├── git.go               # Git worktree operations, branch detection, rebase/merge
 ├── logger.go            # Structured logging (pretty-print + JSON)
 │
+├── internal/
+│   ├── envconfig/       # .env file parsing and atomic update helpers
+│   ├── handler/         # HTTP API handlers (one file per concern)
+│   ├── instructions/    # Workspace CLAUDE.md management
+│   ├── runner/          # Container orchestration, task execution, commit pipeline
+│   └── store/           # In-memory task store, event sourcing, atomic file I/O
+│
 ├── ui/
 │   ├── index.html       # 5-column Kanban board layout
 │   └── js/
@@ -55,7 +62,8 @@ wallfacer/
 │       ├── modal.js     # Task detail modal
 │       ├── git.js       # Git status display
 │       ├── dnd.js       # Drag-and-drop (Sortable.js)
-│       └── events.js    # Event timeline rendering
+│       ├── events.js    # Event timeline rendering
+│       └── envconfig.js # API configuration editor (token, base URL, model)
 │
 ├── sandbox/
 │   ├── Dockerfile       # Ubuntu 24.04 + Go + Node + Python + Claude Code
@@ -103,11 +111,20 @@ Positional arguments after flags are workspace directories to mount (defaults to
 
 ### Environment File
 
-`~/.wallfacer/.env` is passed into sandbox containers. Required variable:
+`~/.wallfacer/.env` is passed into every sandbox container via `--env-file`. The server also parses it to extract the model override.
 
-| Variable | Description |
-|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token obtained via `claude setup-token` |
+At least one authentication variable must be set:
+
+| Variable | Required | Description |
+|---|---|---|
+| `CLAUDE_CODE_OAUTH_TOKEN` | one of these two | OAuth token from `claude setup-token` (Claude Pro/Max) |
+| `ANTHROPIC_API_KEY` | one of these two | Direct API key from console.anthropic.com |
+| `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com` |
+| `CLAUDE_CODE_MODEL` | no | Model passed as `--model` to every `claude` invocation; omit to use the Claude Code default |
+
+All four variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
+
+`wallfacer env` reports the status of all four variables.
 
 ## Server Initialization
 

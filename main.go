@@ -78,7 +78,7 @@ func runEnvCheck(configDir string) {
 	}
 	fmt.Printf("[ok] Env file exists\n")
 
-	tokenSet := false
+	vals := map[string]string{}
 	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "#") || line == "" {
@@ -88,19 +88,38 @@ func runEnvCheck(configDir string) {
 		if !ok {
 			continue
 		}
-		k = strings.TrimSpace(k)
-		v = strings.TrimSpace(v)
-		if k == "CLAUDE_CODE_OAUTH_TOKEN" {
-			if v == "" || v == "your-oauth-token-here" {
-				fmt.Printf("[!] CLAUDE_CODE_OAUTH_TOKEN is not set — edit %s\n", envFile)
-			} else {
-				fmt.Printf("[ok] CLAUDE_CODE_OAUTH_TOKEN is set (%s...%s)\n", v[:4], v[len(v)-4:])
-				tokenSet = true
-			}
-		}
+		vals[strings.TrimSpace(k)] = strings.TrimSpace(v)
 	}
-	if !tokenSet {
-		fmt.Printf("[!] CLAUDE_CODE_OAUTH_TOKEN not found in %s\n", envFile)
+
+	// Authentication: at least one token must be set.
+	oauthToken := vals["CLAUDE_CODE_OAUTH_TOKEN"]
+	apiKey := vals["ANTHROPIC_API_KEY"]
+	switch {
+	case oauthToken != "" && oauthToken != "your-oauth-token-here":
+		masked := oauthToken[:4] + "..." + oauthToken[len(oauthToken)-4:]
+		if len(oauthToken) <= 8 {
+			masked = strings.Repeat("*", len(oauthToken))
+		}
+		fmt.Printf("[ok] CLAUDE_CODE_OAUTH_TOKEN is set (%s)\n", masked)
+	case apiKey != "":
+		masked := apiKey[:4] + "..." + apiKey[len(apiKey)-4:]
+		if len(apiKey) <= 8 {
+			masked = strings.Repeat("*", len(apiKey))
+		}
+		fmt.Printf("[ok] ANTHROPIC_API_KEY is set (%s)\n", masked)
+	default:
+		fmt.Printf("[!] No API token found in %s — set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY\n", envFile)
+	}
+
+	if v := vals["ANTHROPIC_BASE_URL"]; v != "" {
+		fmt.Printf("[ok] ANTHROPIC_BASE_URL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] ANTHROPIC_BASE_URL not set (using default)\n")
+	}
+	if v := vals["CLAUDE_CODE_MODEL"]; v != "" {
+		fmt.Printf("[ok] CLAUDE_CODE_MODEL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] CLAUDE_CODE_MODEL not set (using Claude Code default)\n")
 	}
 
 	containerCmd := envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman")
@@ -138,11 +157,17 @@ func initConfigDir(configDir, envFile string) {
 	}
 
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		content := "CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here\n"
+		content := "# Authentication: set ONE of the two token variables below.\n" +
+			"CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here\n" +
+			"# ANTHROPIC_API_KEY=sk-ant-...\n\n" +
+			"# Optional: custom Anthropic-compatible API base URL.\n" +
+			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
+			"# Optional: override the model used by Claude Code (e.g. claude-opus-4-5).\n" +
+			"# CLAUDE_CODE_MODEL=\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
 			logger.Fatal(logger.Main, "create env file", "error", err)
 		}
-		logger.Main.Info("created env file — edit it and set your CLAUDE_CODE_OAUTH_TOKEN", "path", envFile)
+		logger.Main.Info("created env file — edit it and set your token", "path", envFile)
 	}
 }
 

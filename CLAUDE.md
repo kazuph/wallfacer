@@ -41,16 +41,16 @@ go build -o wallfacer .   # Build server binary
 go vet ./...              # Lint
 ```
 
-There are no tests currently. The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
+The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
 
 Key server files:
 - `main.go` — Subcommand dispatch, CLI flags, workspace resolution, HTTP routing, browser launch
-- `handler.go` — API handlers: tasks CRUD, feedback, resume, complete, cancel, sync, SSE streaming
-- `runner.go` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync
-- `store.go` — Per-task directory persistence, data models (Task, TaskUsage, TaskEvent), event sourcing
-- `git.go` — Git worktree operations, branch detection, rebase/merge
-- `instructions.go` — Workspace-level CLAUDE.md management (`~/.wallfacer/instructions/`)
-- `logger.go` — Structured logging
+- `server.go` — HTTP server setup, mux construction, route registration
+- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream)
+- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync
+- `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TaskEvent), event sourcing
+- `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
+- `internal/instructions/` — Workspace-level CLAUDE.md management (`~/.wallfacer/instructions/`)
 - `ui/index.html` + `ui/js/` — Kanban board UI (vanilla JS + Tailwind CSS CDN + Sortable.js)
 
 ## API Routes
@@ -78,6 +78,8 @@ See `docs/orchestration.md` for full details.
 - `GET /api/git/status` — Git status for all workspaces
 - `GET /api/git/stream` — SSE: git status updates
 - `POST /api/git/push` — Push a workspace
+- `GET /api/env` — Get env config (tokens masked); JSON: `{oauth_token, api_key, base_url, model}`
+- `PUT /api/env` — Update env config; JSON: `{oauth_token?, api_key?, base_url?, model?}`; omitted/empty token fields are preserved
 - `GET /api/instructions` — Get workspace CLAUDE.md content
 - `PUT /api/instructions` — Save workspace CLAUDE.md (JSON: `{content}`)
 - `POST /api/instructions/reinit` — Rebuild workspace CLAUDE.md from default + repo files
@@ -126,4 +128,12 @@ Users can manually edit the file from **Settings → CLAUDE.md → Edit** in the
 
 See `docs/architecture.md#configuration` for the full reference.
 
-Required: `~/.wallfacer/.env` with `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`).
+`~/.wallfacer/.env` must contain at least one of:
+- `CLAUDE_CODE_OAUTH_TOKEN` — OAuth token from `claude setup-token`
+- `ANTHROPIC_API_KEY` — direct API key from console.anthropic.com
+
+Optional variables (also in `.env`):
+- `ANTHROPIC_BASE_URL` — custom API endpoint; passed to the container via `--env-file`
+- `CLAUDE_CODE_MODEL` — model override; the server reads this at each container launch and passes it as `--model` to `claude`
+
+All four can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).

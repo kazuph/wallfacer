@@ -17,28 +17,47 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
 - **Workspace instructions** — per-workspace `CLAUDE.md` managed from the UI; shared across all tasks for that workspace
 - **Multiple workspaces** — mount several project directories at once; Claude can read and write across all of them
 - **Diff viewer** — inspect exactly what changed in each task before accepting it
+- **Configurable API** — set token, base URL, and model from the UI; supports OAuth tokens, direct API keys, and any Anthropic-compatible endpoint
 
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+
 - [Podman](https://podman.io/) or [Docker](https://www.docker.com/)
-- Claude Pro or Max subscription (for the OAuth token)
+- A Claude credential — either:
+  - An **OAuth token** from `claude setup-token` (requires Claude Pro or Max), or
+  - An **Anthropic API key** (`sk-ant-...`) from [console.anthropic.com](https://console.anthropic.com/)
 
 ## Quick Start
 
-**1. Get an OAuth token**
+**1. Obtain a credential**
 
 ```bash
-claude setup-token
+# Option A — OAuth token (Claude Pro/Max)
+claude setup-token   # prints the token; copy it
+
+# Option B — API key
+# Generate one at console.anthropic.com → API Keys
 ```
 
 **2. Configure the environment file**
 
+`wallfacer run` creates `~/.wallfacer/.env` automatically on first launch. Edit it and fill in your credential:
+
 ```bash
-mkdir -p ~/.wallfacer
-cp .env.example ~/.wallfacer/.env
-# Edit ~/.wallfacer/.env and paste your token
+# Option A — OAuth token
+CLAUDE_CODE_OAUTH_TOKEN=<your-token>
+
+# Option B — API key
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional — custom endpoint (proxy, alternative provider, etc.)
+# ANTHROPIC_BASE_URL=https://api.anthropic.com
+
+# Optional — pin a specific model
+# CLAUDE_CODE_MODEL=claude-sonnet-4-5
 ```
+
+You can also edit all of these from **Settings → API Configuration** in the web UI without restarting the server.
 
 **3. Build the sandbox image**
 

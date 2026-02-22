@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
@@ -87,11 +88,27 @@ func (r *Runner) buildContainerArgs(containerName, prompt, sessionID string, wor
 
 	args = append(args, "-w", "/workspace", r.sandboxImage)
 	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
+	if model := r.modelFromEnv(); model != "" {
+		args = append(args, "--model", model)
+	}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
 
 	return args
+}
+
+// modelFromEnv reads CLAUDE_CODE_MODEL from the env file (if configured).
+// Returns an empty string when the file cannot be read or the key is absent.
+func (r *Runner) modelFromEnv() string {
+	if r.envFile == "" {
+		return ""
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return ""
+	}
+	return cfg.Model
 }
 
 // runContainer executes a Claude Code container and parses its NDJSON output.

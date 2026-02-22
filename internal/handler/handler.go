@@ -15,11 +15,18 @@ type Handler struct {
 	runner     *runner.Runner
 	configDir  string
 	workspaces []string
+	envFile    string
 }
 
 // NewHandler constructs a Handler with the given dependencies.
 func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string) *Handler {
-	return &Handler{store: s, runner: r, configDir: configDir, workspaces: workspaces}
+	return &Handler{
+		store:      s,
+		runner:     r,
+		configDir:  configDir,
+		workspaces: workspaces,
+		envFile:    r.EnvFile(),
+	}
 }
 
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.
