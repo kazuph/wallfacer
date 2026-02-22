@@ -177,6 +177,79 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 	t.Fatal("CLAUDE.md -v mount not found in args")
 }
 
+// TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot verifies that when
+// there is exactly one workspace, CLAUDE.md is mounted inside the workspace
+// directory (not at /workspace/) so Claude Code can discover it at the
+// project root. Claude Code searches for CLAUDE.md at the git project root
+// and at ~/.claude/, but NOT in parent directories above the project root.
+func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ws := t.TempDir()
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	runner := NewRunner(s, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		InstructionsPath: instructionsFile,
+		Workspaces:       ws,
+	})
+	args := runner.buildContainerArgs("test-container", "do something", "", nil)
+
+	basename := filepath.Base(ws)
+	expectedMount := instructionsFile + ":/workspace/" + basename + "/CLAUDE.md:z,ro"
+	if !containsConsecutive(args, "-v", expectedMount) {
+		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/%s/CLAUDE.md; got args: %v",
+			basename, args)
+	}
+
+	// Must NOT be mounted at /workspace/CLAUDE.md (parent of project root).
+	wrongMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
+	if containsConsecutive(args, "-v", wrongMount) {
+		t.Fatal("single workspace: CLAUDE.md should NOT be at /workspace/CLAUDE.md")
+	}
+}
+
+// TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
+// there are multiple workspaces, CLAUDE.md is mounted at /workspace/CLAUDE.md
+// (the CWD for multi-workspace mode).
+func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ws1 := t.TempDir()
+	ws2 := t.TempDir()
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	runner := NewRunner(s, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		InstructionsPath: instructionsFile,
+		Workspaces:       ws1 + " " + ws2,
+	})
+	args := runner.buildContainerArgs("test-container", "do something", "", nil)
+
+	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
+	if !containsConsecutive(args, "-v", expectedMount) {
+		t.Fatalf("multi workspace: CLAUDE.md should be at /workspace/CLAUDE.md; got args: %v", args)
+	}
+}
+
 // TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
 // appears before the image name in the args list, matching the expected
 // container launch order.

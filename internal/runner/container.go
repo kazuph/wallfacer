@@ -48,13 +48,6 @@ func (r *Runner) buildContainerArgs(containerName, prompt, sessionID string, wor
 	// Mount claude config volume.
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 
-	// Mount workspace-level CLAUDE.md so Claude Code picks it up automatically.
-	if r.instructionsPath != "" {
-		if _, err := os.Stat(r.instructionsPath); err == nil {
-			args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
-		}
-	}
-
 	// Mount workspaces, substituting per-task worktree paths where available.
 	var basenames []string
 	if r.workspaces != "" {
@@ -84,6 +77,22 @@ func (r *Runner) buildContainerArgs(containerName, prompt, sessionID string, wor
 				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
 					args = append(args, "-v", gitDir+":"+gitDir+":z")
 				}
+			}
+		}
+	}
+
+	// Mount workspace-level CLAUDE.md so Claude Code picks it up automatically.
+	// Claude Code searches for CLAUDE.md at the project root (where .git is)
+	// and at ~/.claude/, but NOT in parent directories above the project root.
+	// For single-workspace tasks, CWD is /workspace/<basename> which IS the
+	// project root, so /workspace/CLAUDE.md (the parent) would be invisible.
+	// Mount directly into the workspace root instead.
+	if r.instructionsPath != "" {
+		if _, err := os.Stat(r.instructionsPath); err == nil {
+			if len(basenames) == 1 {
+				args = append(args, "-v", r.instructionsPath+":/workspace/"+basenames[0]+"/CLAUDE.md:z,ro")
+			} else {
+				args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
 			}
 		}
 	}
