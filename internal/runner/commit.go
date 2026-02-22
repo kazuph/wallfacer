@@ -128,7 +128,7 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 		}
 
 		statOut, _ := exec.Command("git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
-		logOut, _ := exec.Command("git", "-C", worktreePath, "log", "--oneline", "-3").Output()
+		logOut, _ := exec.Command("git", "-C", worktreePath, "log", "--format=%s", "-5").Output()
 		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut)), strings.TrimSpace(string(logOut))})
 	}
 
@@ -199,8 +199,11 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
 		"Rules:\n" +
-		"- Subject line: imperative mood, max 72 characters, no trailing period\n" +
-		"- Optionally add a blank line followed by a short body (2-4 lines) explaining what changed and why\n" +
+		"- Format: <primary-path>: <short imperative description>\n" +
+		"  where <primary-path> is the common directory or file prefix of the changed files\n" +
+		"  (e.g. 'content/posts', 'Makefile', 'internal/runner', 'ui/js')\n" +
+		"- Single line only — no body, no blank lines\n" +
+		"- Max 72 characters total, no trailing period\n" +
 		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n" +
 		"- Match the style and tone of the recent commit history shown below\n\n" +
 		"Task:\n" + prompt + "\n\n" +
