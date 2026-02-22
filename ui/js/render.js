@@ -208,7 +208,7 @@ function updateCard(card, t) {
     <div class="card-output-reason">
       <span class="card-output-label">Output</span><span class="card-output-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
     </div>
-    ` : t.result ? `
+    ` : t.result && t.status !== 'in_progress' ? `
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
