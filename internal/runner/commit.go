@@ -327,6 +327,13 @@ func (r *Runner) rebaseAndMergeOne(
 		return fmt.Errorf("defaultBranch for %s: %w", repoPath, err)
 	}
 
+	// Always capture defBranch HEAD for diff reconstruction, even if there
+	// are no commits to merge. This ensures TaskDiff can show "genuinely no
+	// changes" rather than failing silently when the early return fires.
+	if base, err := gitutil.GetCommitHashForRef(repoPath, defBranch); err == nil {
+		baseHashes[repoPath] = base
+	}
+
 	// Skip if there are no commits to merge.
 	ahead, err := gitutil.HasCommitsAheadOf(worktreePath, defBranch)
 	if err != nil {
@@ -372,12 +379,6 @@ func (r *Runner) rebaseAndMergeOne(
 		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID); resolveErr != nil {
 			return fmt.Errorf("conflict resolution failed: %w", resolveErr)
 		}
-	}
-
-	// Capture defBranch HEAD before the merge so TaskDiff can reconstruct
-	// the full task diff even after worktrees are cleaned up.
-	if base, err := gitutil.GetCommitHash(repoPath); err == nil {
-		baseHashes[repoPath] = base
 	}
 
 	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{

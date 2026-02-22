@@ -47,3 +47,12 @@ func GetCommitHash(repoPath string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
+
+// GetCommitHashForRef returns the commit hash for a specific ref in repoPath.
+func GetCommitHashForRef(repoPath, ref string) (string, error) {
+	out, err := exec.Command("git", "-C", repoPath, "rev-parse", ref).Output()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse %s in %s: %w", ref, repoPath, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}

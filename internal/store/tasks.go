@@ -257,6 +257,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.WorktreePaths = nil
 	t.BranchName = ""
 	t.CommitHashes = nil
+	t.BaseCommitHashes = nil
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
