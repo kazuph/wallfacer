@@ -204,6 +204,40 @@ func TestTaskDiffFallbackToCommitHashes(t *testing.T) {
 	}
 }
 
+func TestTaskDiffFallbackBranchUseMergeBase(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Create a task branch with commits, then advance main.
+	gitRun(t, repo, "checkout", "-b", "task-x")
+	os.WriteFile(filepath.Join(repo, "task-x.txt"), []byte("task X\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "task X commit")
+	gitRun(t, repo, "checkout", "main")
+
+	// Advance main with a different change.
+	os.WriteFile(filepath.Join(repo, "main-advance.txt"), []byte("main\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main advance")
+
+	// Task with worktree gone, but branch exists with commits ahead.
+	task, _ := h.store.CreateTask(ctx, "test", 5)
+	nonexistent := filepath.Join(t.TempDir(), "gone")
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-x")
+
+	resp := callTaskDiff(t, h, task.ID)
+
+	// Should show task-x.txt (the task's change).
+	if !strings.Contains(resp.Diff, "task-x.txt") {
+		t.Error("expected fallback branch diff to show task-x.txt")
+	}
+	// Should NOT show main-advance.txt (main's change that the task doesn't have).
+	if strings.Contains(resp.Diff, "main-advance.txt") {
+		t.Error("fallback branch diff should NOT contain main-advance.txt")
+	}
+}
+
 func TestTaskDiffIsolationConcurrent(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)
