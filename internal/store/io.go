@@ -19,18 +19,18 @@ func (s *Store) saveTask(id uuid.UUID, task *Task) error {
 // SaveTurnOutput persists raw stdout/stderr for a given turn to the outputs directory.
 func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error {
 	outputsDir := filepath.Join(s.dir, taskID.String(), "outputs")
-	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+	if err := os.MkdirAll(outputsDir, 0700); err != nil {
 		return fmt.Errorf("create outputs dir: %w", err)
 	}
 
 	name := fmt.Sprintf("turn-%04d.json", turn)
-	if err := os.WriteFile(filepath.Join(outputsDir, name), stdout, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(outputsDir, name), stdout, 0600); err != nil {
 		return fmt.Errorf("write stdout: %w", err)
 	}
 
 	if len(stderr) > 0 {
 		stderrName := fmt.Sprintf("turn-%04d.stderr.txt", turn)
-		if err := os.WriteFile(filepath.Join(outputsDir, stderrName), stderr, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(outputsDir, stderrName), stderr, 0600); err != nil {
 			return fmt.Errorf("write stderr: %w", err)
 		}
 	}
@@ -45,7 +45,7 @@ func atomicWriteJSON(path string, v any) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0644); err != nil {
+	if err := os.WriteFile(tmp, raw, 0600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)

@@ -351,15 +351,15 @@ async function openModal(id) {
       let detail = '';
       const data = e.data || {};
       if (e.event_type === 'state_change') {
-        detail = `${data.from || '(new)'} → ${data.to}`;
+        detail = `${escapeHtml(data.from || '(new)')} → ${escapeHtml(data.to || '')}`;
       } else if (e.event_type === 'feedback') {
-        detail = `"${escapeHtml(data.message)}"`;
+        detail = `"${escapeHtml(data.message || '')}"`;
       } else if (e.event_type === 'output') {
-        detail = `stop_reason: ${data.stop_reason || '(none)'}`;
+        detail = `stop_reason: ${escapeHtml(data.stop_reason || '(none)')}`;
       } else if (e.event_type === 'system') {
         detail = escapeHtml(data.result || '');
       } else if (e.event_type === 'error') {
-        detail = escapeHtml(data.error);
+        detail = escapeHtml(data.error || '');
       }
       const typeClasses = {
         state_change: 'ev-state',
@@ -370,7 +370,7 @@ async function openModal(id) {
       };
       return `<div class="flex items-start gap-2 text-xs">
         <span class="text-v-muted shrink-0">${time}</span>
-        <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${e.event_type}</span>
+        <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${escapeHtml(e.event_type)}</span>
         <span class="text-v-secondary">${detail}</span>
       </div>`;
     }).join('');

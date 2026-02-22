@@ -75,7 +75,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 
 	taskDir := filepath.Join(s.dir, task.ID.String())
 	tracesDir := filepath.Join(taskDir, "traces")
-	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+	if err := os.MkdirAll(tracesDir, 0700); err != nil {
 		return nil, err
 	}
 

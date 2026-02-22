@@ -10,14 +10,42 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
+// SSE connection limiter.
+var (
+	sseConnections int64
+	maxSSEConns    int64 = 100
+)
+
+// acquireSSESlot increments the SSE connection counter and returns true if the
+// slot was acquired. If the limit is exceeded, it writes a 503 error and returns false.
+func acquireSSESlot(w http.ResponseWriter) bool {
+	if atomic.AddInt64(&sseConnections, 1) > maxSSEConns {
+		atomic.AddInt64(&sseConnections, -1)
+		http.Error(w, "too many SSE connections", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
+// releaseSSESlot decrements the SSE connection counter.
+func releaseSSESlot() {
+	atomic.AddInt64(&sseConnections, -1)
+}
+
 // StreamTasks streams the task list as SSE, pushing an update on every state change.
 func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
+	if !acquireSSESlot(w) {
+		return
+	}
+	defer releaseSSESlot()
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
@@ -71,6 +99,11 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 // StreamLogs streams live container logs for an in-progress task, or serves
 // saved turn outputs for tasks that are no longer running.
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if !acquireSSESlot(w) {
+		return
+	}
+	defer releaseSSESlot()
+
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)

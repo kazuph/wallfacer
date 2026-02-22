@@ -58,7 +58,7 @@ func (s *Store) GetEvents(_ context.Context, taskID uuid.UUID) ([]TaskEvent, err
 // Must be called with s.mu held for writing.
 func (s *Store) saveEvent(taskID uuid.UUID, seq int, event TaskEvent) error {
 	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
-	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+	if err := os.MkdirAll(tracesDir, 0700); err != nil {
 		return err
 	}
 	path := filepath.Join(tracesDir, fmt.Sprintf("%04d.json", seq))

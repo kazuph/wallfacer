@@ -66,7 +66,25 @@ func Parse(path string) (Config, error) {
 //
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
+// validateEnvValue rejects values that contain newlines or null bytes which
+// could corrupt the .env file format or be used for injection.
+func validateEnvValue(v string) error {
+	if strings.ContainsAny(v, "\n\r\x00") {
+		return fmt.Errorf("value contains invalid characters")
+	}
+	return nil
+}
+
 func Update(path string, oauthToken, apiKey, baseURL, model *string) error {
+	// Validate all non-nil values before touching the file.
+	for _, ptr := range []*string{oauthToken, apiKey, baseURL, model} {
+		if ptr != nil && *ptr != "" {
+			if err := validateEnvValue(*ptr); err != nil {
+				return err
+			}
+		}
+	}
+
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
@@ -147,13 +165,15 @@ func isBlankRemovable(l string) bool {
 }
 
 // MaskToken returns a redacted representation of a token for display.
-// Short or empty tokens are fully masked.
+// Short or empty tokens are fully masked. Only the first 3 and last 3
+// characters are exposed to allow minimal identification while reducing
+// leakage of sensitive material.
 func MaskToken(v string) string {
 	if v == "" {
 		return ""
 	}
-	if len(v) <= 8 {
+	if len(v) <= 12 {
 		return strings.Repeat("*", len(v))
 	}
-	return v[:4] + "..." + v[len(v)-4:]
+	return v[:3] + "..." + v[len(v)-3:]
 }

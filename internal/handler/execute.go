@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -15,6 +16,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	var req struct {
 		Message string `json:"message"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -35,7 +37,8 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	}
 
 	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("update status for feedback", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -71,7 +74,8 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	if task.SessionID != nil && *task.SessionID != "" {
 		// Transition to "committing" while auto-commit runs in the background.
 		if err := h.store.UpdateTaskStatus(r.Context(), id, "committing"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Handler.Error("update status to committing", "task", id, "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -101,7 +105,8 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	} else {
 		// No session to commit — go directly to done.
 		if err := h.store.UpdateTaskStatus(r.Context(), id, "done"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Handler.Error("update status to done", "task", id, "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -141,7 +146,8 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	// Persist the cancelled status BEFORE cleaning up worktrees.
 	if err := h.store.UpdateTaskStatus(r.Context(), id, "cancelled"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("cancel task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -163,6 +169,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Timeout *int `json:"timeout"`
 	}
 	// Body is optional — ignore parse errors for backward compatibility.
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	json.NewDecoder(r.Body).Decode(&req)
 
 	task, err := h.store.GetTask(r.Context(), id)
@@ -180,7 +187,8 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("resume task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -206,7 +214,8 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		return
 	}
 	if err := h.store.SetTaskArchived(r.Context(), id, true); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("archive task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -222,7 +231,8 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		return
 	}
 	if err := h.store.SetTaskArchived(r.Context(), id, false); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("unarchive task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -249,7 +259,8 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	oldStatus := task.Status
 	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("sync task status update", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{

@@ -27,6 +27,11 @@ func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
 func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
+	if !acquireSSESlot(w) {
+		return
+	}
+	defer releaseSSESlot()
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
@@ -89,6 +94,7 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspace string `json:"workspace"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -102,8 +108,15 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	logger.Git.Info("push", "workspace", req.Workspace)
 	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "push").CombinedOutput()
 	if err != nil {
-		logger.Git.Error("push failed", "workspace", req.Workspace, "error", err)
-		http.Error(w, string(out), http.StatusInternalServerError)
+		logger.Git.Error("push failed", "workspace", req.Workspace, "error", err, "output", string(out))
+		msg := "push failed"
+		outStr := string(out)
+		if strings.Contains(outStr, "non-fast-forward") {
+			msg = "push rejected: non-fast-forward update (try syncing first)"
+		} else if strings.Contains(outStr, "permission denied") || strings.Contains(outStr, "Authentication failed") {
+			msg = "push failed: authentication error"
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -115,6 +128,7 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspace string `json:"workspace"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -128,8 +142,8 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 	logger.Git.Info("sync workspace", "workspace", req.Workspace)
 
 	if out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "fetch").CombinedOutput(); err != nil {
-		logger.Git.Error("fetch failed", "workspace", req.Workspace, "error", err)
-		http.Error(w, "fetch failed: "+string(out), http.StatusInternalServerError)
+		logger.Git.Error("fetch failed", "workspace", req.Workspace, "error", err, "output", string(out))
+		http.Error(w, "fetch failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -141,7 +155,7 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
 			return
 		}
-		http.Error(w, "rebase failed: "+string(out), http.StatusInternalServerError)
+		http.Error(w, "rebase failed", http.StatusInternalServerError)
 		return
 	}
 
