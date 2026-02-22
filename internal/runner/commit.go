@@ -156,9 +156,25 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	msg := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
 
 	// Second pass: commit each worktree with the generated message.
+	// Use global git identity to prevent sandbox-set local configs from
+	// overriding the host user's author information.
+	var gitConfigOverrides []string
+	if out, err := exec.Command("git", "config", "--global", "user.name").Output(); err == nil {
+		if n := strings.TrimSpace(string(out)); n != "" {
+			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)
+		}
+	}
+	if out, err := exec.Command("git", "config", "--global", "user.email").Output(); err == nil {
+		if e := strings.TrimSpace(string(out)); e != "" {
+			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.email="+e)
+		}
+	}
+
 	committed := false
 	for _, p := range pending {
-		if out, err := exec.Command("git", "-C", p.worktreePath, "commit", "-m", msg).CombinedOutput(); err != nil {
+		args := append([]string{"-C", p.worktreePath}, gitConfigOverrides...)
+		args = append(args, "commit", "-m", msg)
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 			logger.Runner.Warn("host commit: git commit", "repo", p.repoPath, "error", err, "output", string(out))
 			errs = append(errs, fmt.Sprintf("git commit in %s: %v", p.repoPath, err))
 			continue
