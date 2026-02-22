@@ -8,6 +8,7 @@ import (
 	fsLib "io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,7 +32,7 @@ func runServer(configDir string, args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
-	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
+	addr := fs.String("addr", envOrDefault("ADDR", "127.0.0.1:8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"), "container runtime command")
 	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
@@ -91,7 +92,7 @@ func runServer(configDir string, args []string) {
 	logger.Main.Info("store loaded", "path", scopedDataDir)
 
 	worktreesDir := filepath.Join(configDir, "worktrees")
-	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+	if err := os.MkdirAll(worktreesDir, 0700); err != nil {
 		logger.Fatal(logger.Main, "create worktrees dir", "error", err)
 	}
 
@@ -142,7 +143,12 @@ func runServer(configDir string, args []string) {
 	}
 
 	logger.Main.Info("listening", "addr", ln.Addr().String())
-	if err := http.Serve(ln, loggingMiddleware(mux)); err != nil {
+	srv := &http.Server{
+		Handler:           securityMiddleware(loggingMiddleware(mux)),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	if err := srv.Serve(ln); err != nil {
 		logger.Fatal(logger.Main, "server", "error", err)
 	}
 }
@@ -229,6 +235,46 @@ func (w *statusResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+// securityMiddleware sets security headers and enforces CORS for all responses.
+func securityMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "+
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "+
+				"font-src https://fonts.gstatic.com; "+
+				"connect-src 'self'")
+
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if isAllowedOrigin(origin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			}
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isAllowedOrigin returns true for localhost and 127.0.0.1 origins.
+func isAllowedOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1"
 }
 
 // loggingMiddleware logs each HTTP request with method, path, status, and duration.

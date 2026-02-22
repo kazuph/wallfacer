@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/logger"
 )
 
 // envConfigResponse is the JSON representation of the env config sent to the UI.
@@ -20,7 +21,8 @@ type envConfigResponse struct {
 func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
-		http.Error(w, "failed to read env file: "+err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("read env config", "error", err)
+		http.Error(w, "failed to read configuration", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
@@ -47,6 +49,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		BaseURL    *string `json:"base_url"`
 		Model      *string `json:"model"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -61,7 +64,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.Model); err != nil {
-		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("update env config", "error", err)
+		http.Error(w, "failed to update configuration", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

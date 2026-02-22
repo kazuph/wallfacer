@@ -3,13 +3,21 @@
 function renderMarkdown(text) {
   if (!text) return '';
   if (typeof marked === 'undefined') return escapeHtml(text);
-  return marked.parse(text);
+  const html = marked.parse(text);
+  if (typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(html);
+  }
+  return escapeHtml(text); // fallback: no sanitizer available
 }
 
 function renderMarkdownInline(text) {
   if (!text) return '';
   if (typeof marked === 'undefined') return escapeHtml(text);
-  return marked.parseInline(text);
+  const html = marked.parseInline(text);
+  if (typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(html);
+  }
+  return escapeHtml(text); // fallback: no sanitizer available
 }
 
 function toggleModalSection(section) {

@@ -166,7 +166,7 @@ function buildCardActions(t) {
 function updateCard(card, t) {
   const isArchived = !!t.archived;
   const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
-  const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
+  const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : escapeHtml(t.status));
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = (t.status === 'waiting' || t.status === 'failed') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';

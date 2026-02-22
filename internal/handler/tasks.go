@@ -5,19 +5,39 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
+
+// validStatuses defines the set of allowed task status values.
+var validStatuses = map[string]bool{
+	"backlog":     true,
+	"in_progress": true,
+	"done":        true,
+	"waiting":     true,
+	"failed":      true,
+	"cancelled":   true,
+	"committing":  true,
+}
+
+// validOutputFilename matches expected turn output filenames.
+var validOutputFilename = regexp.MustCompile(`^turn-\d+\.(json|stderr\.txt)$`)
+
+// maxBodySize is the default request body limit (1 MB).
+const maxBodySize = 1 << 20
 
 // ListTasks returns all tasks, optionally including archived ones.
 func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	includeArchived := r.URL.Query().Get("include_archived") == "true"
 	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("list tasks", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	if tasks == nil {
@@ -33,6 +53,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Timeout        int    `json:"timeout"`
 		MountWorktrees bool   `json:"mount_worktrees"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -44,7 +65,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("create task", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -67,6 +89,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		FreshStart     *bool   `json:"fresh_start"`
 		MountWorktrees *bool   `json:"mount_worktrees"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -81,19 +104,25 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// Allow editing prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
 	if task.Status == "backlog" && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil) {
 		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Handler.Error("update backlog", "task", id, "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if req.Position != nil {
 		if err := h.store.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Handler.Error("update position", "task", id, "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if req.Status != nil {
+		if !validStatuses[*req.Status] {
+			http.Error(w, "invalid status", http.StatusBadRequest)
+			return
+		}
 		oldStatus := task.Status
 		newStatus := *req.Status
 
@@ -113,7 +142,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				freshStart = *req.FreshStart
 			}
 			if err := h.store.ResetTaskForRetry(r.Context(), id, newPrompt, freshStart); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				logger.Handler.Error("reset for retry", "task", id, "error", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -122,7 +152,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			})
 		} else {
 			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				logger.Handler.Error("update status", "task", id, "error", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
@@ -142,7 +173,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	updated, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("get updated task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
@@ -154,7 +186,8 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 	}
 	if err := h.store.DeleteTask(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("delete task", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -164,7 +197,8 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	events, err := h.store.GetEvents(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("get events", "task", id, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	if events == nil {
@@ -175,14 +209,22 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 
 // ServeOutput serves a raw turn output file for a task.
 func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UUID, filename string) {
-	// Validate filename to prevent path traversal.
-	if strings.Contains(filename, "/") || strings.Contains(filename, "..") {
+	// Strict whitelist: only allow expected turn output filenames.
+	if !validOutputFilename.MatchString(filename) {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
 
-	path := filepath.Join(h.store.OutputsDir(id), filename)
-	if _, err := os.Stat(path); err != nil {
+	baseDir := h.store.OutputsDir(id)
+	fullPath := filepath.Join(baseDir, filename)
+
+	// Defense-in-depth: verify the resolved path stays within the outputs directory.
+	if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(baseDir)) {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := os.Stat(fullPath); err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
@@ -192,7 +234,7 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 	} else {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, fullPath)
 }
 
 // GenerateMissingTitles triggers background title generation for untitled tasks.
@@ -206,7 +248,8 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 
 	tasks, err := h.store.ListTasks(r.Context(), true)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Handler.Error("list tasks for title gen", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
