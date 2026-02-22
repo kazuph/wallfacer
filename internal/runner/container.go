@@ -206,6 +206,25 @@ func parseOutput(raw string) (*claudeOutput, error) {
 	return nil, fmt.Errorf("no valid JSON object found in output")
 }
 
+// extractSessionID scans raw NDJSON output for a session_id field.
+// Claude Code emits session_id in early stream messages, so it is often
+// present even when the container is killed mid-execution (e.g. timeout).
+func extractSessionID(raw []byte) string {
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.SessionID != "" {
+			return obj.SessionID
+		}
+	}
+	return ""
+}
+
 // runGit is a helper to run a git command and discard output (best-effort).
 func runGit(dir string, args ...string) error {
 	return exec.Command("git", append([]string{"-C", dir}, args...)...).Run()

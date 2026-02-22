@@ -95,6 +95,14 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
 		if err != nil {
+			// Try to salvage session_id from partial output so the task
+			// can be resumed even when the container fails (e.g. timeout).
+			if sessionID == "" && len(rawStdout) > 0 {
+				if sid := extractSessionID(rawStdout); sid != "" {
+					sessionID = sid
+				}
+			}
+
 			// If resume produced empty output, drop the session and retry.
 			if sessionID != "" && strings.Contains(err.Error(), "empty output from container") {
 				logger.Runner.Warn("resume produced empty output, retrying without session",
