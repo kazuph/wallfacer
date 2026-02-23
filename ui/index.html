@@ -12,6 +12,7 @@
 <script src="/js/vendor/sortable.min.js"></script>
 <script src="/js/vendor/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.12.0/mermaid.min.js" crossorigin="anonymous"></script>
 </head>
 <body class="h-screen overflow-hidden flex flex-col">
 
@@ -376,6 +377,16 @@
           <div id="modal-result-section" class="hidden mb-4">
             <h3 class="section-title">Result</h3>
             <div id="modal-results-list"></div>
+          </div>
+
+          <!-- Artifacts preview -->
+          <div id="modal-artifacts-section" class="hidden mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="section-title" style="margin-bottom:0;">Artifacts</h3>
+              <span id="modal-artifacts-count" class="text-xs text-v-muted"></span>
+            </div>
+            <div id="modal-artifacts-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+            <div id="modal-artifacts-preview" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-input);min-height:120px;display:none;"></div>
           </div>
 
           <!-- Usage stats -->

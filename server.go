@@ -212,6 +212,17 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 		h.ServeOutput(w, r, id, r.PathValue("filename"))
 	})
 
+	// Artifact discovery and serving.
+	mux.HandleFunc("GET /api/tasks/{id}/artifacts", withID(h.ListArtifacts))
+	mux.HandleFunc("GET /api/tasks/{id}/artifacts/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, "invalid task id", http.StatusBadRequest)
+			return
+		}
+		h.ServeArtifact(w, r, id)
+	})
+
 	return mux
 }
 

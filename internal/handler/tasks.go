@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -276,4 +277,165 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 		"total_without_title": total,
 		"task_ids":            taskIDs,
 	})
+}
+
+// --- Artifact discovery and serving ---
+
+// ArtifactInfo describes a file discovered in a task's worktree.
+type ArtifactInfo struct {
+	Path string `json:"path"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Size int64  `json:"size"`
+}
+
+// artifactExtensions maps file extensions to artifact type categories.
+var artifactExtensions = map[string]string{
+	".html": "html", ".htm": "html",
+	".svg":     "svg",
+	".png":     "image",
+	".jpg":     "image",
+	".jpeg":    "image",
+	".gif":     "image",
+	".webp":    "image",
+	".mp4":     "video",
+	".webm":    "video",
+	".md":      "markdown",
+	".mermaid": "mermaid",
+	".mmd":     "mermaid",
+}
+
+// blockedDirNames lists directory names that should never be traversed.
+var blockedDirNames = map[string]bool{
+	".git": true, "node_modules": true,
+}
+
+// blockedFileNames lists filenames that should never be served.
+var blockedFileNames = map[string]bool{
+	".env": true, ".env.local": true, ".env.production": true,
+}
+
+// ListArtifacts returns files created/modified by the task in its worktrees.
+func (h *Handler) ListArtifacts(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+
+	var artifacts []ArtifactInfo
+	for repoPath, wtPath := range task.WorktreePaths {
+		wsKey := filepath.Base(repoPath)
+		filepath.WalkDir(wtPath, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return nil
+			}
+			name := d.Name()
+			if d.IsDir() {
+				if blockedDirNames[name] || strings.HasPrefix(name, ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if blockedFileNames[name] {
+				return nil
+			}
+			ext := strings.ToLower(filepath.Ext(name))
+			artifactType, ok := artifactExtensions[ext]
+			if !ok {
+				return nil
+			}
+			relPath, err := filepath.Rel(wtPath, path)
+			if err != nil {
+				return nil
+			}
+			var size int64
+			if info, infoErr := d.Info(); infoErr == nil {
+				size = info.Size()
+			}
+			artifacts = append(artifacts, ArtifactInfo{
+				Path: wsKey + "/" + relPath,
+				Name: name,
+				Type: artifactType,
+				Size: size,
+			})
+			return nil
+		})
+	}
+
+	if artifacts == nil {
+		artifacts = []ArtifactInfo{}
+	}
+	writeJSON(w, http.StatusOK, artifacts)
+}
+
+// ServeArtifact serves a specific file from a task's worktree.
+// Path format: {workspace_basename}/{relative_path}
+func (h *Handler) ServeArtifact(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+
+	reqPath := r.PathValue("path")
+	if reqPath == "" {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+
+	// Split into workspace key and relative path.
+	slashIdx := strings.IndexByte(reqPath, '/')
+	if slashIdx < 0 {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	wsKey := reqPath[:slashIdx]
+	relPath := reqPath[slashIdx+1:]
+	if relPath == "" {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Find the matching worktree.
+	var fullPath string
+	for repoPath, wtPath := range task.WorktreePaths {
+		if filepath.Base(repoPath) == wsKey {
+			candidate := filepath.Join(wtPath, relPath)
+			resolved := filepath.Clean(candidate)
+			cleanWt := filepath.Clean(wtPath)
+			// Path traversal defense: resolved path must be within the worktree.
+			if !strings.HasPrefix(resolved, cleanWt+string(filepath.Separator)) {
+				http.Error(w, "invalid path", http.StatusBadRequest)
+				return
+			}
+			fullPath = resolved
+			break
+		}
+	}
+
+	if fullPath == "" {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Block sensitive path segments.
+	for _, seg := range strings.Split(fullPath, string(filepath.Separator)) {
+		if blockedDirNames[seg] || blockedFileNames[seg] {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
+	if _, err := os.Stat(fullPath); err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Allow iframe embedding for same-origin (overrides DENY set by middleware).
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	http.ServeFile(w, r, fullPath)
 }

@@ -1,3 +1,132 @@
+// --- Artifact preview ---
+
+var _mermaidReady = false;
+var _currentArtifacts = [];
+
+function ensureMermaid() {
+  if (!_mermaidReady && typeof mermaid !== 'undefined') {
+    var theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+    mermaid.initialize({ startOnLoad: false, theme: theme });
+    _mermaidReady = true;
+  }
+}
+
+function artifactIcon(type) {
+  switch (type) {
+    case 'image': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
+    case 'html': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
+    case 'svg': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>';
+    case 'video': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    case 'markdown': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+    case 'mermaid': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+    default: return '';
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function loadArtifacts(taskId) {
+  var section = document.getElementById('modal-artifacts-section');
+  var listEl = document.getElementById('modal-artifacts-list');
+  var previewEl = document.getElementById('modal-artifacts-preview');
+  var countEl = document.getElementById('modal-artifacts-count');
+
+  try {
+    var artifacts = await api('/api/tasks/' + taskId + '/artifacts');
+    if (!artifacts || artifacts.length === 0) {
+      section.classList.add('hidden');
+      previewEl.style.display = 'none';
+      return;
+    }
+
+    _currentArtifacts = artifacts;
+    countEl.textContent = artifacts.length + ' file' + (artifacts.length !== 1 ? 's' : '');
+    section.classList.remove('hidden');
+
+    listEl.innerHTML = artifacts.map(function(a, i) {
+      return '<button class="artifact-btn' + (i === 0 ? ' artifact-btn-active' : '') + '" onclick="previewArtifact(\'' + escapeHtml(taskId) + '\',' + i + ')" data-idx="' + i + '">' +
+        artifactIcon(a.type) +
+        ' <span style="font-size:12px;">' + escapeHtml(a.name) + '</span>' +
+        ' <span style="font-size:10px;color:var(--text-muted);">' + formatFileSize(a.size) + '</span>' +
+        '</button>';
+    }).join('');
+
+    // Auto-preview first artifact
+    previewArtifact(taskId, 0);
+  } catch (e) {
+    section.classList.add('hidden');
+    previewEl.style.display = 'none';
+  }
+}
+
+async function previewArtifact(taskId, index) {
+  var previewEl = document.getElementById('modal-artifacts-preview');
+  var listEl = document.getElementById('modal-artifacts-list');
+  var artifact = _currentArtifacts[index];
+  if (!artifact) return;
+
+  // Update active button
+  var btns = listEl.querySelectorAll('.artifact-btn');
+  btns.forEach(function(b) { b.classList.remove('artifact-btn-active'); });
+  var activeBtn = listEl.querySelector('[data-idx="' + index + '"]');
+  if (activeBtn) activeBtn.classList.add('artifact-btn-active');
+
+  previewEl.style.display = 'block';
+  var url = '/api/tasks/' + taskId + '/artifacts/' + encodeURI(artifact.path);
+
+  switch (artifact.type) {
+    case 'image':
+      previewEl.innerHTML = '<div style="padding:12px;text-align:center;"><img src="' + escapeHtml(url) + '" alt="' + escapeHtml(artifact.name) + '" style="max-width:100%;max-height:500px;border-radius:4px;"></div>';
+      break;
+
+    case 'html':
+    case 'svg':
+      previewEl.innerHTML = '<iframe sandbox="allow-scripts" src="' + escapeHtml(url) + '" style="width:100%;height:400px;border:none;background:#fff;"></iframe>';
+      break;
+
+    case 'video':
+      previewEl.innerHTML = '<video controls src="' + escapeHtml(url) + '" style="width:100%;max-height:400px;"></video>';
+      break;
+
+    case 'markdown':
+      previewEl.innerHTML = '<div style="padding:16px;color:var(--text);">Loading...</div>';
+      try {
+        var resp = await fetch(url);
+        var text = await resp.text();
+        previewEl.innerHTML = '<div class="prose-content" style="padding:16px;">' + renderMarkdown(text) + '</div>';
+      } catch (e) {
+        previewEl.innerHTML = '<div style="padding:16px;color:var(--text-muted);">Failed to load</div>';
+      }
+      break;
+
+    case 'mermaid':
+      previewEl.innerHTML = '<div style="padding:16px;color:var(--text);">Rendering diagram...</div>';
+      try {
+        ensureMermaid();
+        var mResp = await fetch(url);
+        var mText = await mResp.text();
+        if (typeof mermaid !== 'undefined' && mermaid.render) {
+          var mId = 'mermaid-preview-' + Date.now();
+          var result = await mermaid.render(mId, mText.trim());
+          previewEl.innerHTML = '<div style="padding:16px;text-align:center;overflow:auto;">' + result.svg + '</div>';
+        } else {
+          previewEl.innerHTML = '<pre style="padding:16px;font-size:12px;overflow:auto;">' + escapeHtml(mText) + '</pre>';
+        }
+      } catch (e) {
+        // Fallback: show raw text
+        previewEl.innerHTML = '<pre style="padding:16px;font-size:12px;color:var(--text-muted);overflow:auto;">' + escapeHtml(e.message || 'Render failed') + '</pre>';
+      }
+      break;
+
+    default:
+      previewEl.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:13px;">Preview not available for this file type.</div>';
+  }
+}
+
 // --- Multi-turn result rendering ---
 
 function detectResultType(text) {
@@ -216,6 +345,9 @@ async function openModal(id) {
     usageSection.classList.add('hidden');
   }
 
+  // Load artifacts (non-blocking)
+  loadArtifacts(id);
+
   const logsSection = document.getElementById('modal-logs-section');
   if (task.status !== 'backlog') {
     logsSection.classList.remove('hidden');
@@ -389,6 +521,9 @@ function closeModal() {
   }
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
+  _currentArtifacts = [];
+  document.getElementById('modal-artifacts-preview').style.display = 'none';
+  document.getElementById('modal-artifacts-preview').innerHTML = '';
   currentTaskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
