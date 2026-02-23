@@ -57,6 +57,12 @@ func (s *Store) OutputsDir(taskID uuid.UUID) string {
 	return filepath.Join(s.dir, taskID.String(), "outputs")
 }
 
+// LiveLogPath returns the path to the live log file for a running task.
+// The runner writes exec stdout here in real-time; StreamLogs tails it.
+func (s *Store) LiveLogPath(taskID uuid.UUID) string {
+	return filepath.Join(s.dir, taskID.String(), "live.log")
+}
+
 // loadAll scans the data directory and populates in-memory maps.
 func (s *Store) loadAll() error {
 	entries, err := os.ReadDir(s.dir)

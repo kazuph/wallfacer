@@ -392,146 +392,6 @@ func TestRunContainerWithSessionID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildContainerArgs extras (paths not covered by runner_test.go)
-// ---------------------------------------------------------------------------
-
-// TestBuildContainerArgsWithSessionID verifies that a non-empty sessionID
-// adds --resume <sessionID> to the container args.
-func TestBuildContainerArgsWithSessionID(t *testing.T) {
-	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "sess-abc", nil, "", nil)
-	if !containsConsecutive(args, "--resume", "sess-abc") {
-		t.Fatalf("expected --resume sess-abc in args; got: %v", args)
-	}
-}
-
-// TestBuildContainerArgsWithEnvFile verifies that a non-empty envFile adds
-// --env-file to the container args.
-func TestBuildContainerArgsWithEnvFile(t *testing.T) {
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, []byte("KEY=val\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "docker",
-		SandboxImage: "test:latest",
-		EnvFile:      envFile,
-	})
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
-	if !containsConsecutive(args, "--env-file", envFile) {
-		t.Fatalf("expected --env-file %s in args; got: %v", envFile, args)
-	}
-}
-
-// TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides
-// replaces the workspace host path in the volume mount.
-func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
-	ws := t.TempDir()
-	wt := t.TempDir()
-
-	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "docker",
-		SandboxImage: "test:latest",
-		Workspaces:   ws,
-	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{ws: wt}, "", nil)
-	basename := filepath.Base(ws)
-	expectedMount := wt + ":/workspace/" + basename + ":z"
-	if !containsConsecutive(args, "-v", expectedMount) {
-		t.Fatalf("expected worktree override mount %q; got: %v", expectedMount, args)
-	}
-	// Original workspace path must NOT appear as the host path.
-	unexpectedMount := ws + ":/workspace/" + basename + ":z"
-	if containsConsecutive(args, "-v", unexpectedMount) {
-		t.Fatalf("original workspace path should be replaced by worktree, but found %q", unexpectedMount)
-	}
-}
-
-// TestBuildContainerArgsWorktreeGitDirMount verifies that when a workspace has
-// a worktree override and the original workspace is a git repo, the main repo's
-// .git directory is mounted at its host path so the worktree's .git file
-// reference resolves correctly inside the container.
-func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
-	// Create a real git repo so .git directory exists.
-	repo := setupTestRepo(t)
-	wt := t.TempDir()
-
-	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "docker",
-		SandboxImage: "test:latest",
-		Workspaces:   repo,
-	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{repo: wt}, "", nil)
-
-	// The main repo's .git should be mounted at the same host path.
-	gitDir := filepath.Join(repo, ".git")
-	expectedGitMount := gitDir + ":" + gitDir + ":z"
-	if !containsConsecutive(args, "-v", expectedGitMount) {
-		t.Fatalf("expected .git dir mount %q; got: %v", expectedGitMount, args)
-	}
-}
-
-// TestBuildContainerArgsNoGitDirMountWithoutWorktree verifies that when no
-// worktree override is used, no extra .git directory mount is added.
-func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
-	repo := setupTestRepo(t)
-
-	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	r := NewRunner(s, RunnerConfig{
-		Command:      "docker",
-		SandboxImage: "test:latest",
-		Workspaces:   repo,
-	})
-	// No worktree override — direct mount of workspace.
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
-
-	gitDir := filepath.Join(repo, ".git")
-	gitMount := gitDir + ":" + gitDir + ":z"
-	if containsConsecutive(args, "-v", gitMount) {
-		t.Fatalf("should NOT mount .git dir separately when no worktree override; found %q", gitMount)
-	}
-}
-
-// TestBuildContainerArgsNoSessionID verifies that omitting sessionID means
-// --resume is NOT added to the args.
-func TestBuildContainerArgsNoSessionID(t *testing.T) {
-	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
-	for i, a := range args {
-		if a == "--resume" {
-			t.Fatalf("--resume should not appear when sessionID is empty (found at index %d)", i)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // GenerateTitle
 // ---------------------------------------------------------------------------
 
@@ -694,10 +554,10 @@ func TestRunContainerParseErrorWithExitCode(t *testing.T) {
 // the container is running causes runContainer to return a "container terminated"
 // error immediately.
 func TestRunContainerContextCancelled(t *testing.T) {
-	// Script that handles lifecycle calls (rm/kill) quickly but sleeps on "run".
+	// Script that handles sandbox lifecycle calls quickly but sleeps on "exec".
 	dir := t.TempDir()
 	scriptPath := filepath.Join(dir, "slow-cmd")
-	script := "#!/bin/sh\ncase \"$1\" in rm|kill) exit 0 ;; esac\nsleep 10\n"
+	script := "#!/bin/sh\ncase \"$1\" in sandbox) case \"$2\" in create|stop|rm|ls) exit 0 ;; esac ;; esac\nsleep 10\n"
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}

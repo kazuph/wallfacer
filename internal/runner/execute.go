@@ -86,6 +86,39 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	turns := task.Turns
 
+	// Copy CLAUDE.md into worktree roots.
+	copyInstructionsToWorktrees(r.instructionsPath, worktreePaths)
+
+	// Create sandbox only on first run. When resuming from "waiting", the
+	// sandbox is still alive (we kept it via removeSandbox=false).
+	if !resumedFromWaiting {
+		var sandboxWorkspaces []string
+		for _, wt := range worktreePaths {
+			sandboxWorkspaces = append(sandboxWorkspaces, wt)
+		}
+
+		if err := r.CreateSandbox(ctx, taskID, sandboxWorkspaces); err != nil {
+			logger.Runner.Error("create sandbox", "task", taskID, "error", err)
+			statusSet = true
+			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+				"from": "in_progress", "to": "failed",
+			})
+			return
+		}
+	}
+
+	// Track whether sandbox should be removed on exit. It is kept alive
+	// when the task goes to "waiting" so resume works.
+	removeSandbox := true
+	defer func() {
+		if removeSandbox {
+			r.RemoveSandbox(taskID)
+		}
+	}()
+
 	// Prepare board context (board.json manifest of all tasks).
 	boardDir, boardErr := r.prepareBoardContext(taskID, task.MountWorktrees)
 	if boardErr != nil {
@@ -213,6 +246,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				return
 			}
 			statusSet = true
+			removeSandbox = false // Keep sandbox alive for resume.
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from": "in_progress", "to": "waiting",

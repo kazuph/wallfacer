@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,7 +34,6 @@ func runServer(configDir string, args []string) {
 	addr := fs.String("addr", envOrDefault("ADDR", "127.0.0.1:8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "docker"), "container runtime command")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 
@@ -103,11 +101,8 @@ func runServer(configDir string, args []string) {
 		logger.Main.Info("workspace instructions", "path", instructionsPath)
 	}
 
-	resolvedImage := ensureImage(*containerCmd, *sandboxImage)
-
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
-		SandboxImage:     resolvedImage,
 		EnvFile:          *envFile,
 		Workspaces:       strings.Join(workspaces, " "),
 		WorktreesDir:     worktreesDir,
@@ -292,34 +287,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// ensureImage checks whether the sandbox image is present locally and pulls it
-// from the registry if it is not.  When the pull fails and a local fallback
-// image (wallfacer:latest) is available, that image is used instead.
-// Returns the image reference that should actually be used.
-func ensureImage(containerCmd, image string) string {
-	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
-	if err == nil && strings.TrimSpace(string(out)) != "" {
-		return image // already present
-	}
-	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
-	cmd := exec.Command(containerCmd, "pull", image)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
-		// Try the local fallback image if it differs from the requested one.
-		if image != fallbackSandboxImage {
-			fallbackOut, fallbackErr := exec.Command(containerCmd, "images", "-q", fallbackSandboxImage).Output()
-			if fallbackErr == nil && strings.TrimSpace(string(fallbackOut)) != "" {
-				logger.Main.Info("using local fallback sandbox image", "image", fallbackSandboxImage)
-				return fallbackSandboxImage
-			}
-		}
-		logger.Main.Warn("no sandbox image available; tasks may fail")
-	}
-	return image
-}
-
 // recoverOrphanedTasks reconciles in_progress/committing tasks on startup by
 // checking which containers are still running.
 //
@@ -338,15 +305,16 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 		return
 	}
 
-	// Build a set of task IDs whose containers are currently running.
-	runningContainers := map[string]bool{}
+	// Build a set of sandbox short IDs (first 8 chars of UUID) whose
+	// sandboxes are currently running.
+	runningSandboxes := map[string]bool{}
 	if containers, listErr := r.ListContainers(); listErr != nil {
 		logger.Recovery.Warn("could not list containers during recovery; treating all in_progress tasks as stopped",
 			"error", listErr)
 	} else {
 		for _, c := range containers {
 			if c.State == "running" && c.TaskID != "" {
-				runningContainers[c.TaskID] = true
+				runningSandboxes[c.TaskID] = true
 			}
 		}
 	}
@@ -366,7 +334,9 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 			})
 
 		case "in_progress":
-			if runningContainers[t.ID.String()] {
+			// Match by short ID (first 8 chars) since sandbox names use wf-<8chars>.
+			shortID := t.ID.String()[:8]
+			if runningSandboxes[shortID] {
 				// Container is still active — leave the task in_progress and
 				// monitor it; move to waiting once the container stops.
 				logger.Recovery.Info("container still running after restart, monitoring",
@@ -397,7 +367,7 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 // to waiting so the user can decide what to do next.
 func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.UUID) {
 	ctx := context.Background()
-	containerName := "wallfacer-" + taskID.String()
+	containerName := "wf-" + taskID.String()[:8]
 	ticker := time.NewTicker(containerPollInterval)
 	defer ticker.Stop()
 

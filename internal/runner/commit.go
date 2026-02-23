@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -190,9 +189,9 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	return committed, nil
 }
 
-// generateCommitMessage runs a lightweight container to produce a descriptive
-// git commit message from the task prompt, staged diff stats, and recent git
-// log history (used to match the project's commit style).
+// generateCommitMessage runs a lightweight one-shot sandbox to produce a
+// descriptive git commit message from the task prompt, staged diff stats, and
+// recent git log history (used to match the project's commit style).
 // Falls back to a truncated prompt on any error.
 func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) string {
 	firstLine := prompt
@@ -204,15 +203,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
-	containerName := "wallfacer-commit-" + taskID.String()[:8]
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
-	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
-	}
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
-	args = append(args, r.sandboxImage)
+	name := "wf-c-" + taskID.String()[:8]
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
 		"Rules:\n" +
@@ -228,28 +219,10 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if recentLog != "" {
 		commitPrompt += "\nRecent commits (for style reference):\n" + recentLog
 	}
-	args = append(args, "-p", commitPrompt, "--output-format", "stream-json", "--verbose")
 
-	cmd := exec.CommandContext(ctx, r.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil && ctx.Err() == nil {
-		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err,
-			"stderr", truncate(stderr.String(), 200))
-		return fallback
-	}
-
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		logger.Runner.Warn("commit message generation: empty output", "task", taskID)
-		return fallback
-	}
-
-	output, err := parseOutput(raw)
+	output, err := r.runOneShotSandbox(ctx, name, commitPrompt, nil)
 	if err != nil {
-		logger.Runner.Warn("commit message generation: parse failure", "task", taskID, "raw", truncate(raw, 200))
+		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
 		return fallback
 	}
 

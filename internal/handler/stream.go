@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -96,8 +94,9 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// StreamLogs streams live container logs for an in-progress task, or serves
-// saved turn outputs for tasks that are no longer running.
+// StreamLogs serves logs for a task. For in-progress tasks with a live.log
+// file, it tails the file in real-time. For completed tasks, it serves
+// the saved turn outputs.
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	if !acquireSSESlot(w) {
 		return
@@ -109,38 +108,28 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "in_progress" && task.Status != "committing" {
-		// Container is gone (--rm). Serve saved stderr from disk instead.
-		h.serveStoredLogs(w, r, id)
-		return
+
+	// For in-progress/committing tasks, try to tail the live log file.
+	if task.Status == "in_progress" || task.Status == "committing" {
+		liveLogPath := h.store.LiveLogPath(id)
+		if _, statErr := os.Stat(liveLogPath); statErr == nil {
+			h.tailLiveLog(w, r, liveLogPath)
+			return
+		}
 	}
 
+	// Fall back to stored turn outputs.
+	h.serveStoredLogs(w, r, id)
+}
+
+// tailLiveLog streams a live log file to the HTTP response, polling for
+// new content until the client disconnects or the file is removed.
+func (h *Handler) tailLiveLog(w http.ResponseWriter, r *http.Request, path string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
-
-	containerName := "wallfacer-" + id.String()
-	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-
-	// Merge container stdout and stderr.
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-
-	if err := cmd.Start(); err != nil {
-		pr.Close()
-		pw.Close()
-		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
-		return
-	}
-
-	// Close the write end once the subprocess exits.
-	go func() {
-		cmd.Wait()
-		pw.Close()
-	}()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -149,36 +138,44 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	// Feed scanner output through a channel so we can interleave keepalives.
-	lines := make(chan string)
-	go func() {
-		defer close(lines)
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			lines <- scanner.Text()
-		}
-	}()
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
 
+	buf := make([]byte, 4096)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 	keepalive := time.NewTicker(15 * time.Second)
 	defer keepalive.Stop()
 
 	for {
 		select {
 		case <-r.Context().Done():
-			pr.Close()
 			return
-		case line, ok := <-lines:
-			if !ok {
+		case <-ticker.C:
+			// Check if file still exists (removed when exec completes).
+			if _, statErr := os.Stat(path); statErr != nil {
 				return
 			}
-			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				pr.Close()
-				return
+			for {
+				n, readErr := f.Read(buf)
+				if n > 0 {
+					if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+						return
+					}
+					flusher.Flush()
+				}
+				if readErr == io.EOF || n == 0 {
+					break
+				}
+				if readErr != nil {
+					return
+				}
 			}
-			flusher.Flush()
 		case <-keepalive.C:
 			if _, err := w.Write([]byte("\n")); err != nil {
-				pr.Close()
 				return
 			}
 			flusher.Flush()

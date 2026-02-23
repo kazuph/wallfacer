@@ -14,9 +14,9 @@ import (
 )
 
 // fakeStatefulCmd creates an executable shell script that returns different
-// JSON outputs on successive invocations. Container lifecycle calls ("rm",
-// "kill") are silently skipped without advancing the counter, so only the
-// real "run ..." calls consume an output slot.
+// JSON outputs on successive invocations. Sandbox lifecycle calls (create,
+// stop, rm, ls) are handled as no-ops without advancing the counter, so
+// only exec calls consume an output slot.
 func fakeStatefulCmd(t *testing.T, outputs []string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -39,10 +39,19 @@ func fakeStatefulCmd(t *testing.T, outputs []string) string {
 		t.Fatal(err)
 	}
 
-	// The script skips "rm" and "kill" subcommands and uses a counter to
-	// select the output file on each real invocation.
+	// The script handles sandbox subcommands: create/stop/rm/ls are no-ops;
+	// exec uses a counter to select the output file on each invocation.
 	script := fmt.Sprintf(`#!/bin/sh
 case "$1" in
+  sandbox)
+    case "$2" in
+      create|stop|rm) exit 0 ;;
+      ls) echo '{"sandboxes":[]}' ; exit 0 ;;
+      exec) ;;
+      *) exit 0 ;;
+    esac
+    if [ "$2" != "exec" ]; then exit 0; fi
+    ;;
   rm|kill) exit 0 ;;
 esac
 count=$(cat %s 2>/dev/null || echo 0)
@@ -75,7 +84,6 @@ func setupRunnerWithCmd(t *testing.T, workspaces []string, cmd string) (*store.S
 	}
 	r := NewRunner(s, RunnerConfig{
 		Command:      cmd,
-		SandboxImage: "test:latest",
 		Workspaces:   strings.Join(workspaces, " "),
 		WorktreesDir: worktreesDir,
 	})

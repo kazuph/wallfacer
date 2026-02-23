@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// fakeCmdScript creates a temporary executable shell script. When called with
-// any arguments the script writes output to stdout and exits with exitCode.
-// Using a file avoids shell-quoting issues with arbitrary output strings.
+// fakeCmdScript creates a temporary executable shell script that simulates
+// the docker sandbox CLI. Sandbox lifecycle calls (create/stop/rm/ls) are
+// handled as no-ops; exec calls emit the configured output.
 func fakeCmdScript(t *testing.T, output string, exitCode int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -24,7 +24,19 @@ func fakeCmdScript(t *testing.T, output string, exitCode int) string {
 	}
 
 	scriptPath := filepath.Join(dir, "fake-cmd")
-	script := fmt.Sprintf("#!/bin/sh\ncat %s\nexit %d\n", dataPath, exitCode)
+	script := fmt.Sprintf(`#!/bin/sh
+case "$1" in
+  sandbox)
+    case "$2" in
+      create|stop|rm) exit 0 ;;
+      ls) echo '{"sandboxes":[]}' ; exit 0 ;;
+      exec) cat %s ; exit %d ;;
+    esac
+    ;;
+esac
+cat %s
+exit %d
+`, dataPath, exitCode, dataPath, exitCode)
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +60,6 @@ func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	}
 	return NewRunner(s, RunnerConfig{
 		Command:      cmd,
-		SandboxImage: "test:latest",
 		WorktreesDir: worktreesDir,
 	})
 }
@@ -205,7 +216,6 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	}
 	runner := NewRunner(s, RunnerConfig{
 		Command:      cmd,
-		SandboxImage: "test:latest",
 		Workspaces:   repo,
 		WorktreesDir: worktreesDir,
 	})
@@ -257,7 +267,6 @@ func TestHostStageAndCommitFallsBackOnContainerFailure(t *testing.T) {
 	}
 	runner := NewRunner(s, RunnerConfig{
 		Command:      cmd,
-		SandboxImage: "test:latest",
 		Workspaces:   repo,
 		WorktreesDir: worktreesDir,
 	})
