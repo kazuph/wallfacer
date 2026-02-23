@@ -104,7 +104,7 @@ func (r *Runner) execInSandbox(
 	if workdir != "" {
 		args = append(args, "-w", workdir)
 	}
-	args = append(args, name, "claude", "-p", prompt, "--verbose", "--output-format", "stream-json")
+	args = append(args, name, "claude", "-p", prompt, "--verbose", "--output-format", "stream-json", "--dangerously-skip-permissions")
 	if model := r.modelFromEnv(); model != "" {
 		args = append(args, "--model", model)
 	}
@@ -241,7 +241,7 @@ func (r *Runner) runOneShotSandbox(ctx context.Context, name, prompt string, wor
 	if r.envFile != "" {
 		execArgs = append(execArgs, "--env-file", r.envFile)
 	}
-	execArgs = append(execArgs, name, "claude", "-p", prompt, "--output-format", "stream-json", "--verbose")
+	execArgs = append(execArgs, name, "claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions")
 	if model := r.modelFromEnv(); model != "" {
 		execArgs = append(execArgs, "--model", model)
 	}
